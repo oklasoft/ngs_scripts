@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 # =======================================================================================================================
 # expected file format:
 # "lgs_code","Contig","Reference position","Consensus position","Variation type","Length","Reference","Variants","Allele variations","Frequencies","Counts","Coverage","Variant #1","Frequency of #1","Count of #1","Variant #2","Frequency of #2","Count of #2","Overlapping annotations","Amino acid change",
