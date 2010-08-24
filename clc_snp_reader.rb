@@ -158,6 +158,6 @@ Dir.open(OUTDIRECTORY_NAME) do |dir|
     results_3.each { |line| file.write(line.join("\t") + "\n") }
   end
   File.open(dir.path + "/intersection_info.txt", "w") do |file|
-    file.write()
+    file.write(INTERSECTION_NAME + "\n")
   end
 end
