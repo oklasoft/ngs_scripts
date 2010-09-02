@@ -31,6 +31,9 @@ optparse = OptionParser.new do |opts|
       options[:not_files] ||= []
       options[:not_files] << file
   end
+  opts.on( '-o', '--out NAME', 'Specify name of output directory; defaults to the specified intersection.') do |name|
+      options[:outdirectory_name] = name
+  end
   
 end
 
@@ -46,6 +49,7 @@ NON_COUNTING_CODES = NOT_FILES.map { |filename| filename.split('_').first }
 
 # display intersection info.
 INTERSECTION_NAME = COUNTING_CODES.join(" AND ") + NON_COUNTING_CODES.map { |not_file| " NOT #{not_file}" }.join
+OUTDIRECTORY_NAME = options[:outdirectory_name] || INTERSECTION_NAME
 puts INTERSECTION_NAME
 
 # -------------------------------------------------------------------
@@ -139,8 +143,8 @@ file1_heading = ["contig", "position", "reference", "allele variations", "overla
 file2_heading = ["contig", "position", "ref/var"]
 file3_heading = ["contig", "position-1", "position"]
 
-Dir.mkdir(INTERSECTION_NAME)
-Dir.open(INTERSECTION_NAME) do |dir|
+Dir.mkdir(OUTDIRECTORY_NAME)
+Dir.open(OUTDIRECTORY_NAME) do |dir|
   FasterCSV.open(dir.path + "/for_graham.csv", "w") do |csv|
     csv << file1_heading
     results_1.each { |line| csv << line }
@@ -152,5 +156,8 @@ Dir.open(INTERSECTION_NAME) do |dir|
   File.open(dir.path + "/bed_file.bed", "w") do |file|
     file.write(file3_heading.join("\t") + "\n")
     results_3.each { |line| file.write(line.join("\t") + "\n") }
+  end
+  File.open(dir.path + "/intersection_info.txt", "w") do |file|
+    file.write(INTERSECTION_NAME + "\n")
   end
 end

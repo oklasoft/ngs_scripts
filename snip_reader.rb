@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-
 # =======================================================================================================================
 # expected file format:
 # "lgs_code","Contig","Reference position","Consensus position","Variation type","Length","Reference","Variants","Allele variations","Frequencies","Counts","Coverage","Variant #1","Frequency of #1","Count of #1","Variant #2","Frequency of #2","Count of #2","Overlapping annotations","Amino acid change",
@@ -45,16 +43,27 @@ def generate_gene_data_from_regions_file
   # @gene_data = {'NC_000001 contig' => {:low => 123456, :high => 234567, :name => 'PTPN22'},
   #              'NC_000002 contig' => {:low => 345678, :high => 456789, :name => 'CHROMEY'}}
   @gene_data = {}
-  FasterCSV.read(@regions_file).each_with_index do |line, i|
-    next if i == 0 || line[9].nil?
-    chromosome = line[9]
-    low = line[10].gsub(',', '').to_i
-    high = line[11].gsub(',', '').to_i
-    name = line[12]
+  
+  File.readlines(@regions_file).each_with_index do |line, i|
+    next if i == 0
+    chromosome, low, high, name = line.strip.split("\t")
+    low = low.gsub(',', '').to_i
+    high = high.gsub(',', '').to_i
     raise "Mapping for #{chromosome} not found; make sure regions file line #{i + 1} is properly formatted." unless CHROMOSOME_TO_CONTIG.keys.include?(chromosome)
-    @gene_data[CHROMOSOME_TO_CONTIG[chromosome]] ||= []
-    @gene_data[CHROMOSOME_TO_CONTIG[chromosome]] << {:low => low, :high => high, :name => name}
+    @gene_data[chromosome] ||= []
+    @gene_data[chromosome] << {:low => low, :high => high, :name => name}
   end
+  
+  # FasterCSV.read(@regions_file).each_with_index do |line, i|
+  #   next if i == 0 || line[9].nil?
+  #   chromosome = line[9]
+  #   low = line[10].gsub(',', '').to_i
+  #   high = line[11].gsub(',', '').to_i
+  #   name = line[12]
+  #   raise "Mapping for #{chromosome} not found; make sure regions file line #{i + 1} is properly formatted." unless CHROMOSOME_TO_CONTIG.keys.include?(chromosome)
+  #   @gene_data[chromosome] ||= []
+  #   @gene_data[chromosome] << {:low => low, :high => high, :name => name}
+  # end
 end
 
 def main
@@ -96,7 +105,7 @@ def parse_command_line_input
   end
 
   raise "Must pass at least 1 lgs file and 1 regions file." unless @initial_files && @regions_file
-  raise "Regions file must be a csv." unless @regions_file =~ /(\.csv)$/
+  raise "Regions file must be .txt format." unless @regions_file =~ /(\.txt)$/
 end
 
 def create_contig_and_position
@@ -275,9 +284,9 @@ def write_from_line_to_bed_file(line, bed_file)
   extras = [number_of_subjects, reference, allele_variations, gene_name].join('_').gsub(/_$/, '')
   # position output changes if using dip files
   if @dip
-    bed_file.write("#{CHROMOSOME_TO_CONTIG[contig]}\t#{position}\t#{position + length}\t#{extras}\n")
+    bed_file.write("#{contig}\t#{position}\t#{position + length}\t#{extras}\n")
   else
-    bed_file.write("#{CHROMOSOME_TO_CONTIG[contig]}\t#{position - 1}\t#{position}\t#{extras}\n")
+    bed_file.write("#{contig}\t#{position - 1}\t#{position}\t#{extras}\n")
   end
 end
 
