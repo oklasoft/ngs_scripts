@@ -1,23 +1,24 @@
 #!/usr/bin/env ruby1.8
 
-output_base = ARGV.shift
-reference = ARGV.shift
+args = ARGV.clone
+# args.shift
+output_base = args.shift
+reference = args.shift
 index = (ENV['SGE_TASK_ID']||1).to_i - 1
 
 groups = [] #ARGV.each_slice(5).to_a[index]
 
-ARGV.each do |a|
-  data << {}
-
+while a = args.shift
+  data = {}
   if "paired" == a then
     data[:mode] = "sampe"
   else
     data[:mode] = "samse"
   end
-  data[:tag] = ARGV.shift
-  data[:inputs] = ["#{ARGV.shift}"]
+  data[:tag] = args.shift
+  data[:inputs] = ["#{args.shift}","#{args.shift}"]
   
-  data[:inputs] << ["#{ARGV.shift}"] if "sampe" == data[:mode]
+  data[:inputs] << ["#{args.shift}","#{args.shift}"] if "sampe" == data[:mode]
   
   groups << data
 end
