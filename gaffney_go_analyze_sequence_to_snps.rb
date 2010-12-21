@@ -18,7 +18,7 @@ def fastq_file_list(sample_name,data)
       base_file = "#{prefix}_#{pair_part}"
       path = "`pwd`\"/#{prefix}/#{base_file}.fastq\""
       fastqs << "#{shell_var}=#{path}"
-      @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file}
+      @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
       @fastq_shell_vars_by_lane[-1] << shell_var
     end
   end
@@ -31,6 +31,16 @@ def ordered_fastq_inputs()
     line += "${#{input}} "
   end
   line
+end
+
+def gzip_original_fastq(sample_name)
+  #qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
+  cmds = []
+  @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
+    cmds << "qsub -o logs -b y -V -j y -cwd -q all.q -N #{sample_name}_gzip_#{i} gzip --fast ${#{input}}"
+    cmds << "qsub -o logs -b y -V -j y -cwd -q all.q -N #{sample_name}_gzip_#{i}_rejects gzip --fast #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
+  end
+  cmds.join("\n")
 end
 
 def total_number_input_sequence_files
@@ -324,10 +334,13 @@ rm -rf 00_inputs \
 
 # gzip something
 # TODO ${FASTQ1} ${FASTQ2} ${FASTQ3} ${FASTQ4} & rejects
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ2}
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ3}
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ4}
+<%=
+  gzip_original_fastq(sample_name)
+%>
+# qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
+# qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ2}
+# qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ3}
+# qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ4}
 
 touch finished.txt
 EOF
