@@ -13,9 +13,10 @@ def fastq_file_list(sample_name,data)
     @fastq_shell_vars_by_lane << []
     sequence[:inputs].each_with_index do |input,i_i|
       prefix = "#{sample_name}_#{sequence[:run]}_#{sequence[:lane]}"
+      cleaned_prefix = "#{sample_name}_cleaned_#{sequence[:run]}_#{sequence[:lane]}"
       pair_part = sequence[:is_paired] ? i_i+1 : 0
       shell_var = "FASTQ#{fastqs.size+1}"
-      base_file = "#{prefix}_#{pair_part}"
+      base_file = "#{cleaned_prefix}_#{pair_part}"
       path = "`pwd`\"/#{prefix}/#{base_file}.fastq\""
       fastqs << "#{shell_var}=#{path}"
       @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
@@ -97,7 +98,7 @@ def clean_commands(sample_name,data)
   #clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
   cleans = []
   data.each_with_index do |sequence,s_i|
-    cmd = "clean_sample.rb -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
+    cmd = "clean_sample.rb -s #{sample_name} -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
     unless sequence[:is_paired]
       cmd += " --single-end"
     end
@@ -139,8 +140,10 @@ SAMPLE="<%= sample_name %>"
   clean_commands(sample_name,data)
 %>
 
-
-#clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
+if [ "$?" -ne "0" ]; then
+  echo -e "Failure with btang cleaning"
+  exit 1
+fi
 
 # TODO samtools flagstat logged on each bam?
 
@@ -366,7 +369,7 @@ samples.each do |sample_name|
 
   Dir.mkdir("logs")
   
-  cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N #{sample_name}_full #{script_file}"
+  cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N #{sample_name}_full ./analyze.sh"
   puts cmd
   system cmd
   
