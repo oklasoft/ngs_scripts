@@ -21,4 +21,6 @@ system cmd
 
 cmd = "rm #{output} && mv #{sorted_output}.bam #{output}"
 puts cmd
+STDOUT.flush
+
 exec cmd

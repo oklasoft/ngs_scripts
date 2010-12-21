@@ -11,5 +11,6 @@ output = File.join(output_base,"#{File.basename(input,".fastq")}.sai")
 cmd = "bwa aln -t 12 -f #{output} #{reference} #{input}"
 
 puts cmd
+STDOUT.flush
 
 exec cmd
