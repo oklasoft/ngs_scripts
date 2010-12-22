@@ -112,6 +112,76 @@ def clean_commands(sample_name,data)
   cleans.join("\n")
 end
 
+def covariate_or_final(sample_name,data)
+  if data.first[:snp_rod] || @default_config[:snp_rod]
+    coviarate_recalibration(sample_name,data)
+  else
+    skip_coviarate_recalibration(sample_name,data)
+  end
+end
+
+def skip_coviarate_recalibration(sample_name,data)
+  <<-EOF
+  mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
+  mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bam.sai
+  EOF
+end
+
+def coviarate_recalibration(sample_name,data)
+  ERB.new(<<-EOF
+  # HERE
+
+  mkdir 08_uncalibated_covariates
+  # recalibration 
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates gatk -T CountCovariates -R ${GATK_REF} -D ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure counting covariates"
+   exit 1
+  fi
+
+  mkdir 09_original_covariate_analysis
+  qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
+
+  mkdir 10_recalibrated_bam
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate gatk -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure reclibrating bam"
+   exit 1
+  fi
+
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
+
+  if [ "$?" -ne "0" ]; then
+    echo -e "Failure sorting recalibrated"
+    exit 1
+  fi
+
+  rm ./10_recalibrated_bam/recalibrated.bam && mv ./10_recalibrated_bam/recalibrated-sorted.bam ./10_recalibrated_bam/recalibrated.bam
+
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bam.bai
+
+
+  mkdir 11_calibated_covariates
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates gatk -T CountCovariates -R ${GATK_REF} -D ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure counting calibrated covariates"
+   exit 1
+  fi
+
+  mkdir 12_recalibrated_covariate_analysis
+  qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
+
+  mkdir 13_final_bam
+  # resort & index that bam
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai  
+  EOF
+  ).result(binding)
+end
+
 output_base = ARGV.shift
 config = YAML::load(File.open(ARGV.shift))
 
@@ -128,7 +198,7 @@ module load fastqc/0.7.2
 module load btangs/1.2.0
 
 GATK_REF=<%= data.first[:gatk_ref] || @default_config[:gatk_ref] %>
-GATK_DBSNP=<%= data.first[:snp_rod] || @default_config[:snp_rod] %>
+GATK_DBSNP=<%= data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
 
 GATK_BIN=`which gatk`
 GATK_BASE=`dirname ${GATK_BIN}`"/.."
@@ -265,54 +335,7 @@ if [ "$?" -ne "0" ]; then
   exit 1
 fi
 
-
-mkdir 08_uncalibated_covariates
-# recalibration 
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates gatk -T CountCovariates -R ${GATK_REF} -D ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure counting covariates"
- exit 1
-fi
-
-mkdir 09_original_covariate_analysis
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
-
-mkdir 10_recalibrated_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate gatk -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure reclibrating bam"
- exit 1
-fi
-
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure sorting recalibrated"
-  exit 1
-fi
-
-rm ./10_recalibrated_bam/recalibrated.bam && mv ./10_recalibrated_bam/recalibrated-sorted.bam ./10_recalibrated_bam/recalibrated.bam
-
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bam.bai
-
-
-mkdir 11_calibated_covariates
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates gatk -T CountCovariates -R ${GATK_REF} -D ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure counting calibrated covariates"
- exit 1
-fi
-
-mkdir 12_recalibrated_covariate_analysis
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
-
-mkdir 13_final_bam
-# resort & index that bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai
+<%= covariate_or_final(sample_name,data) %>
 
 # fastqc
 mkdir qc
