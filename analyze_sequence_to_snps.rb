@@ -61,8 +61,12 @@ def link_fastq_inputs()
   lines.join("\n")
 end
 
+def bwa_reference_for_data(data)
+  data.first[:bwa_ref] || @default_config[:bwa_ref]
+end
+
 def bwa_aligment_command(sample_name,data)
-  cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment TODO_BWA_REF"
+  cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
       cmd += " paired"
@@ -123,8 +127,8 @@ module load gatk/1.0.4705
 module load fastqc/0.7.2
 module load btangs/1.2.0
 
-GATK_REF=TODO_REFERENCE_GENOME
-GATK_DBSNP=TODO_REFENCE_SNP_ROD
+GATK_REF=<%= data.first[:gatk_ref] || @default_config[:gatk_ref] %>
+GATK_DBSNP=<%= data.first[:snp_rod] || @default_config[:snp_rod] %>
 
 GATK_BIN=`which gatk`
 GATK_BASE=`dirname ${GATK_BIN}`"/.."
@@ -160,7 +164,7 @@ fi
 
 mkdir 01_bwa_aln_sai
 # prep all reads for alignment
-qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa <%= ordered_fastq_inputs() %>
+qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(data) %> <%= ordered_fastq_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
@@ -336,7 +340,6 @@ rm -rf 00_inputs \
 11_calibated_covariates
 
 # gzip something
-# TODO ${FASTQ1} ${FASTQ2} ${FASTQ3} ${FASTQ4} & rejects
 <%=
   gzip_original_fastq(sample_name)
 %>
