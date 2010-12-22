@@ -406,7 +406,7 @@ samples.each do |sample_name|
   
   cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N #{sample_name}_full ./analyze.sh"
   puts cmd
-#  system cmd
+  system cmd
   
   Dir.chdir(return_dir)
 end
