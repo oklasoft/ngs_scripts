@@ -89,6 +89,13 @@ def bwa_aligment_command(sample_name,data)
   return cmd  
 end
 
+def default_rg(sample_name,data)
+  return "" if data.first[:is_paired]
+  data = data.first
+  "--default_read_group #{sample_name}_#{data[:run]}_s_#{data[:lane]} --default_platform Illumina"
+end
+
+
 def input_sam_bam_files(prefix,suffix)
   cmd = ""
   # 02_bwa_alignment/A.sam 02_bwa_alignment/B.sam
@@ -144,7 +151,7 @@ def coviarate_recalibration(sample_name,data)
   qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
 
   mkdir 10_recalibrated_bam
-  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate gatk -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam
+  qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate gatk -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %>
 
   if [ "$?" -ne "0" ]; then
    echo -e "Failure reclibrating bam"
