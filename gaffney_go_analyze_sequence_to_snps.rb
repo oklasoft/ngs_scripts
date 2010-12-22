@@ -102,7 +102,7 @@ def clean_commands(sample_name,data)
     unless sequence[:is_paired]
       cmd += " --single-end"
     end
-    cmd += " #{sequence[:inputs].join(" ")}"
+    cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
     cleans << "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
   end
   cleans.join("\n")
