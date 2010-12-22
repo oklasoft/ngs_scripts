@@ -123,7 +123,7 @@ module load gatk/1.0.4705
 module load fastqc/0.7.2
 module load btangs/1.2.0
 
-GATK_REF=/Volumes/hts_core/Shared/homlo_sapiens_36.1/chr_fixed/hg18.fasta
+GATK_REF=/Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta
 GATK_DBSNP=/Volumes/hts_core/Shared/dbsnp/dbsnp_129_hg18.rod
 
 GATK_BIN=`which gatk`
