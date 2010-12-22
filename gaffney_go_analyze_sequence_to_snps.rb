@@ -62,7 +62,7 @@ def link_fastq_inputs()
 end
 
 def bwa_aligment_command(sample_name,data)
-  cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment /Volumes/hts_core/Shared/homo_sapiens_36.1/bwa_indexed/hg18.fa"
+  cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa"
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
       cmd += " paired"
@@ -123,7 +123,7 @@ module load gatk/1.0.4705
 module load fastqc/0.7.2
 module load btangs/1.2.0
 
-GATK_REF=/Volumes/hts_core/Shared/homo_sapiens_36.1/hg18_with_mt.fasta
+GATK_REF=/Volumes/hts_core/Shared/homlo_sapiens_36.1/chr_fixed/hg18.fasta
 GATK_DBSNP=/Volumes/hts_core/Shared/dbsnp/dbsnp_129_hg18.rod
 
 GATK_BIN=`which gatk`
@@ -160,7 +160,7 @@ fi
 
 mkdir 01_bwa_aln_sai
 # prep all reads for alignment
-qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai /Volumes/hts_core/Shared/homo_sapiens_36.1/bwa_indexed/hg18.fa <%= ordered_fastq_inputs() %>
+qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa <%= ordered_fastq_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
