@@ -12,11 +12,11 @@ def fastq_file_list(sample_name,data)
     letter = letters[s_i]
     @fastq_shell_vars_by_lane << []
     sequence[:inputs].each_with_index do |input,i_i|
-      prefix = "#{sample_name}_#{sequence[:run]}_#{sequence[:lane]}"
-      cleaned_prefix = "#{sample_name}_cleaned_#{sequence[:run]}_#{sequence[:lane]}"
+      prefix = "#{sample_name}_#{sequence[:run]}_#{sequence[:lane]}".downcase
+      cleaned_prefix = "#{sample_name}_cleaned_#{sequence[:run]}_#{sequence[:lane]}".downcase
       pair_part = sequence[:is_paired] ? i_i+1 : 0
       shell_var = "FASTQ#{fastqs.size+1}"
-      base_file = "#{cleaned_prefix}_#{pair_part}"
+      base_file = "#{cleaned_prefix}_#{pair_part}".downcase
       path = "`pwd`\"/#{prefix}/#{base_file}.fastq\""
       fastqs << "#{shell_var}=#{path}"
       @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
