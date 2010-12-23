@@ -27,7 +27,7 @@ def fastq_file_list(sample_name,data)
 end
 
 def fastq_shell_vars()
-  @fastq_shell_vars.map{|v| "${#{v}}"}.join(" ")
+  @fastq_shell_vars.keys.map{|v| "${#{v}}"}.join(" ")
 end
 
 def ordered_fastq_inputs()

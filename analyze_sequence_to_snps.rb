@@ -27,7 +27,7 @@ def fastq_file_list(sample_name,data)
 end
 
 def fastq_shell_vars()
-  @fastq_shell_vars.map{|v| "${#{v}}"}.join(" ")
+  @fastq_shell_vars.keys.map{|v| "${#{v}}"}.join(" ")
 end
 
 
@@ -134,6 +134,7 @@ end
 
 def skip_coviarate_recalibration(sample_name,data)
   <<-EOF
+  mkdir 13_final_bam
   mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
   mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bam.sai
   EOF
