@@ -136,7 +136,7 @@ def skip_coviarate_recalibration(sample_name,data)
   <<-EOF
   mkdir 13_final_bam
   mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
-  mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bam.sai
+  mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.sai
   EOF
 end
 
