@@ -277,7 +277,7 @@ fi
 
 mkdir 04_merged_bam
 # merge the two lanes into one bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -302,7 +302,7 @@ fi
 
 mkdir 05_dup_marked
 # mark duplicates with picard
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -374,7 +374,7 @@ rm -rf 00_inputs \
 08_uncalibated_covariates \
 10_recalibrated_bam \
 11_calibated_covariates \
-qc/*/*.zip
+qc/*.zip
 
 # gzip something
 <%=
