@@ -16,4 +16,4 @@ cmd = "add_read_group_to_sam.pl -i #{output_base}/#{index}.sam -R -r #{tag} -s #
 puts cmd
 STDOUT.flush
 
-#exec cmd
+exec cmd
