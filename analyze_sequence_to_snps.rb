@@ -26,6 +26,11 @@ def fastq_file_list(sample_name,data)
   fastqs.join("\n")
 end
 
+def fastq_shell_vars()
+  @fastq_shell_vars.map{|v| "${#{v}}"}.join(" ")
+end
+
+
 def ordered_fastq_inputs()
   line = ""
   @fastq_shell_vars_by_lane.flatten.each do |input|
@@ -346,7 +351,7 @@ fi
 
 # fastqc
 mkdir qc
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_qc fastqc -o qc ${FASTQ1} ${FASTQ2} ${FASTQ3} ${FASTQ4} ./13_final_bam/<%= sample_name %>.bam
+qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= sample_name %>.bam
 
 # call indels & snps
 qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_indels gatk -T IndelGenotyperV2 -R ${GATK_REF} -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_indels.vcf
