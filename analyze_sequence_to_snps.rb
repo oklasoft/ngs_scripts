@@ -94,6 +94,15 @@ def bwa_aligment_command(sample_name,data)
   return cmd  
 end
 
+def fix_sam_read_group(sample_name,data)
+  cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_fix_sam_rg fix_sam_rg_qsub_tasked.rb 02_bwa_alignment Illumina #{sample_name}"
+  @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
+    # rg
+    cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}"
+  end
+  return cmd  
+end
+
 def default_rg(sample_name,data)
   return "" if data.first[:is_paired]
   data = data.first
@@ -265,6 +274,17 @@ if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa alignment"
   exit 1
 fi
+
+# Fix those SAMs with full read group stuff
+<%=
+  fix_sam_read_group(sample_name,data)
+%>
+
+if [ "$?" -ne "0" ]; then
+  echo -e "Failure with SAM RG fix"
+  exit 1
+fi
+
 
 mkdir 03_first_bam
 # make some bams
