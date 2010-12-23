@@ -372,7 +372,8 @@ rm -rf 00_inputs \
 07_realigned_bam \
 08_uncalibated_covariates \
 10_recalibrated_bam \
-11_calibated_covariates
+11_calibated_covariates \
+qc/*/*.zip
 
 # gzip something
 <%=
