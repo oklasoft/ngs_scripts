@@ -430,7 +430,8 @@ samples.each do |sample_name|
   raise "Failed to change to dir: #{output_dir} for #{sample_name}" unless Dir.chdir(output_dir)
 
   Dir.mkdir("logs")
-  
+
+  sleep(Random.new.rand(10..30))
   cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N #{sample_name}_full ./analyze.sh"
   puts cmd
   system cmd
