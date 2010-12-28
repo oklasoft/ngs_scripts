@@ -39,4 +39,13 @@ end
 puts cmd
 STDOUT.flush
 
+system cmd
+
+output_bam = File.join(output_base,"#{index}.bam")
+
+cmd = "samtools view -b #{output} > #{output_bam}"
+
+puts cmd
+STDOUT.flush
+
 exec cmd
