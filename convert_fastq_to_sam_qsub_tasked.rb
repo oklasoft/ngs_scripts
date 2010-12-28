@@ -21,7 +21,7 @@ while a = args.shift
   data[:unit] = args.shift
   
   data[:inputs] = ["#{args.shift}"]  
-  data[:inputs] << ["#{args.shift}","#{args.shift}"] if "paired" == data[:mode]
+  data[:inputs] << ["#{args.shift}"] if "paired" == data[:mode]
   
   groups << data
 end
@@ -30,7 +30,7 @@ data = groups[index]
 
 output = File.join(output_base,"#{index}.sam")
 
-cmd = "picard FastqToSam QUALITY_FORMAT=Illumina OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].first}"
+cmd = "picard FastqToSam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=1000000 QUALITY_FORMAT=Illumina OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].shift}"
 
 unless data[:inputs].empty? then
   cmd += " FASTQ2=#{data[:inputs].shift}"
