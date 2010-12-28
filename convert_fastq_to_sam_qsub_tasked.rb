@@ -17,8 +17,8 @@ while a = args.shift
   else
     data[:mode] = "single"
   end
-  data[:unit] = args.shift
   data[:id] = args.shift
+  data[:unit] = args.shift
   
   data[:inputs] = ["#{args.shift}"]  
   data[:inputs] << ["#{args.shift}","#{args.shift}"] if "paired" == data[:mode]
