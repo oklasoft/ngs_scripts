@@ -46,7 +46,7 @@ end
 
 output_bam = File.join(output_base,"#{index}.bam")
 
-cmd = "samtools view -b #{output} > #{output_bam}"
+cmd = "samtools view -bhS #{output} > #{output_bam}"
 
 puts cmd
 STDOUT.flush
