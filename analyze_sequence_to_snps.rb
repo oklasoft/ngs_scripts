@@ -7,6 +7,7 @@ def fastq_file_list(sample_name,data)
   fastqs = []
   @fastq_shell_vars = {}
   @fastq_shell_vars_by_lane = []
+  @input_sam_files = []
   letters = %w/A B C D E F G H I J K L M N O P Q R S T U V W X Y Z/
   data.each_with_index do |sequence,s_i|
     letter = letters[s_i]
@@ -21,6 +22,7 @@ def fastq_file_list(sample_name,data)
       fastqs << "#{shell_var}=#{path}"
       @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
       @fastq_shell_vars_by_lane[-1] << shell_var
+      @input_sam_files << {:index => s_i, :b_index => pair_part}
     end
   end
   fastqs.join("\n")
@@ -31,12 +33,8 @@ def fastq_shell_vars()
 end
 
 
-def ordered_fastq_inputs()
-  line = ""
-  @fastq_shell_vars_by_lane.flatten.each do |input|
-    line += "${#{input}} "
-  end
-  line
+def ordered_sam_inputs()
+  @input_sam_files.map {|s| "#{s[:b_index]} ./00_inputs/#{s[:index]}.bam"}.join(" ")
 end
 
 def gzip_original_fastq(sample_name)
@@ -103,7 +101,6 @@ def create_original_sam_inputs(sample_name,data)
       cmd += " single"
     end
 
-    # rg
     cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]} #{data[index][:lane]}"
 
     # fastq file(s)
@@ -271,7 +268,7 @@ mkdir 00_inputs
 
 mkdir 01_bwa_aln_sai
 # prep all reads for alignment
-qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(data) %> <%= ordered_fastq_inputs() %>
+qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(data) %> <%= ordered_sam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"

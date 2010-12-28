@@ -4,11 +4,11 @@ output_base = ARGV.shift
 reference = ARGV.shift
 index = ENV['SGE_TASK_ID'].to_i - 1
 
-input = ARGV[index]
+inputs = ARGV.each_slice(2).to_a[index]
 
-output = File.join(output_base,"#{File.basename(input,".fastq")}.sai")
+output = File.join(output_base,"#{File.basename(inputs.last,".bam")}.sai")
 
-cmd = "bwa aln -t 12 -f #{output} #{reference} #{input}"
+cmd = "bwa aln -t 12 -f #{output} #{reference} -b#{inputs.first} #{inputs.last}"
 
 puts cmd
 STDOUT.flush
