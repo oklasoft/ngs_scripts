@@ -83,7 +83,7 @@ def bwa_alignment_command(sample_name,data)
     # 01_bwa_aln_sai file(s)
     lane_shell_vars.each do |v|
       # cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
-      cmd += " 00_inputs/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
+      cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
     end
     # fastq file(s)
     lane_shell_vars.each do |v|
@@ -234,7 +234,7 @@ script_template = <<-EOF
 module load bwa/0.5.9rc1
 module load samtools/0.1.12
 module load picard/1.36
-module load gatk/1.0.4705
+module load gatk/1.0.4905
 module load fastqc/0.7.2
 module load btangs/1.2.0
 
