@@ -7,6 +7,7 @@ def fastq_file_list(sample_name,data)
   fastqs = []
   @fastq_shell_vars = {}
   @fastq_shell_vars_by_lane = []
+  @input_sam_files = []
   letters = %w/A B C D E F G H I J K L M N O P Q R S T U V W X Y Z/
   data.each_with_index do |sequence,s_i|
     letter = letters[s_i]
@@ -21,6 +22,7 @@ def fastq_file_list(sample_name,data)
       fastqs << "#{shell_var}=#{path}"
       @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
       @fastq_shell_vars_by_lane[-1] << shell_var
+      @input_sam_files << {:index => s_i, :b_index => pair_part}
     end
   end
   fastqs.join("\n")
@@ -31,12 +33,8 @@ def fastq_shell_vars()
 end
 
 
-def ordered_fastq_inputs()
-  line = ""
-  @fastq_shell_vars_by_lane.flatten.each do |input|
-    line += "${#{input}} "
-  end
-  line
+def ordered_sam_inputs()
+  @input_sam_files.map {|s| "#{s[:b_index]} ./00_inputs/#{s[:index]}.bam"}.join(" ")
 end
 
 def gzip_original_fastq(sample_name)
@@ -70,7 +68,7 @@ def bwa_reference_for_data(data)
   data.first[:bwa_ref] || @default_config[:bwa_ref]
 end
 
-def bwa_aligment_command(sample_name,data)
+def bwa_alignment_command(sample_name,data)
   cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
@@ -84,8 +82,29 @@ def bwa_aligment_command(sample_name,data)
 
     # 01_bwa_aln_sai file(s)
     lane_shell_vars.each do |v|
-      cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
+      # cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
+      cmd += " 00_inputs/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
     end
+    # fastq file(s)
+    lane_shell_vars.each do |v|
+      # cmd += " ${#{v}}"
+      cmd += " 00_inputs/#{index}.bam"
+    end
+  end
+  return cmd  
+end
+
+def create_original_sam_inputs(sample_name,data)
+  cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
+  @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
+    if data[index][:is_paired]
+      cmd += " paired"
+    else
+      cmd += " single"
+    end
+
+    cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]} #{data[index][:lane]}"
+
     # fastq file(s)
     lane_shell_vars.each do |v|
       cmd += " ${#{v}}"
@@ -244,19 +263,14 @@ fi
 # TODO samtools flagstat logged on each bam?
 
 # setup inputs
-# mkdir 00_inputs
+mkdir 00_inputs
 <%=
-  #link_fastq_inputs()
+  create_original_sam_inputs(sample_name,data)
 %>
-
-# ln -s ${FASTQ1} 00_inputs/A_1.fastq
-# ln -s ${FASTQ2} 00_inputs/A_2.fastq
-# ln -s ${FASTQ3} 00_inputs/B_1.fastq
-# ln -s ${FASTQ4} 00_inputs/B_2.fastq
 
 mkdir 01_bwa_aln_sai
 # prep all reads for alignment
-qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(data) %> <%= ordered_fastq_inputs() %>
+qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(data) %> <%= ordered_sam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
@@ -267,7 +281,7 @@ fi
 mkdir 02_bwa_alignment
 # align two lanes
 <%=
-  bwa_aligment_command(sample_name,data)
+  bwa_alignment_command(sample_name,data)
 %>
 
 if [ "$?" -ne "0" ]; then
@@ -435,7 +449,7 @@ samples.each do |sample_name|
   sleep(rand(30))
   cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N #{sample_name}_full ./analyze.sh"
   puts cmd
-  system cmd
+  #system cmd
   
   Dir.chdir(return_dir)
 end
