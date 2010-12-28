@@ -268,6 +268,12 @@ mkdir 00_inputs
   create_original_sam_inputs(sample_name,data)
 %>
 
+if [ "$?" -ne "0" ]; then
+  echo -e "Failure converting fastq to sam"
+  exit 1
+fi
+
+
 mkdir 01_bwa_aln_sai
 # prep all reads for alignment
 qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(data) %> <%= ordered_sam_inputs() %>

@@ -30,7 +30,7 @@ data = groups[index]
 
 output = File.join(output_base,"#{index}.sam")
 
-cmd = "picard FastqToSam QUALITY_FORMAT=Illumina OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{dat[:unit]} FASTQ=#{data[:inputs].first}"
+cmd = "picard FastqToSam QUALITY_FORMAT=Illumina OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].first}"
 
 unless data[:inputs].empty? then
   cmd += " FASTQ2=#{data[:inputs].shift}"
@@ -39,7 +39,10 @@ end
 puts cmd
 STDOUT.flush
 
-system cmd
+unless system(cmd)
+  STDERR.puts "Failed with picard"
+  exit 1
+end
 
 output_bam = File.join(output_base,"#{index}.bam")
 
