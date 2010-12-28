@@ -6,7 +6,7 @@ index = ENV['SGE_TASK_ID'].to_i - 1
 
 inputs = ARGV.each_slice(2).to_a[index]
 
-output = File.join(output_base,"#{File.basename(inputs.last,".bam")}.sai")
+output = File.join(output_base,"#{File.basename(inputs.last,".bam")}-#{inputs.first}.sai")
 
 cmd = "bwa aln -t 12 -f #{output} #{reference} -b#{inputs.first} #{inputs.last}"
 
