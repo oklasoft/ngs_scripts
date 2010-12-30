@@ -297,13 +297,13 @@ fi
 
 # Fix those SAMs with full read group stuff
 <%=
-  fix_sam_read_group(sample_name,data)
+#  fix_sam_read_group(sample_name,data)
 %>
 
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure with SAM RG fix"
-  exit 1
-fi
+# if [ "$?" -ne "0" ]; then
+#   echo -e "Failure with SAM RG fix"
+#   exit 1
+# fi
 
 
 mkdir 03_first_bam
