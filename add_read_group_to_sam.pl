@@ -104,7 +104,7 @@ while(<STDIN>) {
     }
     else {
       chomp($_);
-      $_ .= "\tRG:Z:$readgroup\tSM:Z:$sample\n";
+      $_ .= "\tRG:Z:$readgroup\n";
     }
   }
 
