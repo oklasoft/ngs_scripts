@@ -29,7 +29,7 @@ tag = data[:tag]
 
 output = File.join(output_base,"#{index}.sam")
 
-cmd = "bwa #{data[:mode]} -r \"#{tag}\" -f #{output} #{reference} #{data[:inputs].join(" ")}"
+cmd = "bwa #{data[:mode]} -f #{output} #{reference} #{data[:inputs].join(" ")}"
 
 puts cmd
 STDOUT.flush
