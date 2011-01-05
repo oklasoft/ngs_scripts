@@ -260,7 +260,7 @@ class PedFixerApp
   # columns
   def template_valid?()
     msg = ''
-    if File.readable?(@options.template_file)
+    if @options.template_file && File.readable?(@options.template_file)
       msg = "Wrong format, no data?"
       IO.foreach(@options.template_file) do |line|
         next if line =~ /^#/
