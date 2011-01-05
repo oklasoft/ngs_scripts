@@ -6,7 +6,10 @@
 #
 # == Synopsis
 # Quick script to take a template ped file (first 6 columns) of real data &
-# replace then then the bogus columns in vcftools produced ped files
+# replace then then the bogus columns in vcftools produced ped files. We will
+# also optionally add invidiuals to the new ped files from the template. These
+# added individuals will have no genotypes for all the genotypes listed in the
+# original
 #
 # == Inputs
 #  - The template file is 7 columns, first being indivual id in the target ped files
@@ -25,6 +28,7 @@
 #  -v, --version          Display the version information
 #  -V, --verbose          Increased verbosity of output
 #  -t, --template FILE    Specify the input template pedigree
+#  -a, --add_indivuals    Add any/all individuals in the template, regardless of them being present in original
 #  -p, --prefix STR       Specify the prefix the output file(s)
 #  -i, --inplace EXT      Save new file in place, saving original files with given extension.
 #                         Note original is not saved if no extension is given with -i option
@@ -112,6 +116,7 @@ class PedFixerApp
   # Read the ped template file & load its data into a hash for later use
   def load_pedigree_template
     @ped_template = {}
+    @individuals_not_seen = []
     IO.foreach(@options.template_file) do |line|
       next if line =~ /^#/
       parts = line.chomp.split(PEDIGREE_FILE_DELIMITER)
@@ -119,7 +124,9 @@ class PedFixerApp
         @stderr.puts "Failure near line #{$.} of #{@options.template_file}; incorrect number of fields"
         return false
       end
-      @ped_template[parts.shift] = parts
+      id = parts.shift
+      @ped_template[id] = parts
+      @individuals_not_seen << id
     end
     return true
   end #load_pedigree_template
@@ -185,15 +192,34 @@ class PedFixerApp
   # * +output+ - An opened & writable File object into which the results go
   # We will also use the @ped_template hash to try to fix each line
   def write_fixed_file_to(input,output)
+    num_markers = 0
     IO.foreach(input) do |line|
-      output.puts(fixed_line(line.chomp.split(PEDIGREE_FILE_DELIMITER)))
+      parts = line.chomp.split(PEDIGREE_FILE_DELIMITER)
+      output.puts(fixed_line!(parts))
+      if 0 == num_markers
+        num_markers = (parts.size)/2
+      end
     end
+    add_missing_individuals(output,num_markers) if @options.add_individuals
   end #write_fixed_file_to(input,output)
 
+  # Add any subjects from the template which we didn't yet add to output by 
+  # giving them missing genotypes for everything
+  # * +output+ - To where to write
+  # * +num_markers+ - How many genotypes to are they to get
+  def add_missing_individuals(output,num_markers)
+    genos = ["0"] * num_markers * 2
+    @individuals_not_seen.each do |id|
+      ped = @ped_template[id]
+      output.puts (ped + genos).join(PEDIGREE_FILE_DELIMITER)
+    end
+  end #add_missing_individuals(output)
+
   # Fix the given line by looking for the match in the ped_template hash
-  def fixed_line(line_parts)
+  def fixed_line!(line_parts)
     orig_ped = line_parts.shift(NUM_PEDIGREE_FIELDS)
     ped = @ped_template[orig_ped[0]] || orig_ped
+    @individuals_not_seen.delete(orig_ped[0])
     (ped + line_parts).join(PEDIGREE_FILE_DELIMITER)
   end #fixed_line(line)
 
@@ -215,6 +241,7 @@ class PedFixerApp
       :verbose => false,
       :save_inplace => false,
       :backup_extension => nil,
+      :add_individuals => false,
       :input_files => [@stdin]
     )
   end #set_default_options
@@ -229,6 +256,8 @@ class PedFixerApp
       opts.on('-v','--version') { output_version(@stdout); exit(0) }
       opts.on('-h','--help') { output_help(@stdout); exit(0) }
       opts.on('-V', '--verbose')    { @options.verbose = true }
+
+      opts.on('-a', '--add_individuals')    { @options.add_individuals = true }
       
       opts.on("-t","--template", "=REQUIRED") do |template_file|
         @options.template_file = template_file
@@ -377,6 +406,7 @@ Options:
  -v, --version          Display the version information
  -V, --verbose          Increased verbosity of output
  -t, --template FILE    Specify the input template pedigree
+ -a, --add_indivuals    Add any/all individuals in the template, regardless of them being present in original
  -p, --prefix STR       Specify the prefix the output file(s)
  -i, --inplace EXT      Save new file in place, saving original files with given extension.
                         Note original is not saved if no extension is given with -i option
