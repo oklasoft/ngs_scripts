@@ -231,11 +231,18 @@ samples = ARGV.clone
 script_template = <<-EOF
 #!/bin/bash
 
+# be sure to start with a fresh & known enviroment (hopefully)
+module unload bwa
 module load bwa/0.5.9rc1
+module unload samtools
 module load samtools/0.1.12
+module unload picard
 module load picard/1.36
+module unload gatk
 module load gatk/1.0.4905
+module unload fastqc
 module load fastqc/0.7.2
+module unload btangs
 module load btangs/1.2.0
 
 GATK_REF=<%= data.first[:gatk_ref] || @default_config[:gatk_ref] %>
