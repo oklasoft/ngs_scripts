@@ -251,7 +251,7 @@ File.open("#{output_base}","w") do |out|
   target_lines = []
   
   keys = samples.keys
-  positions = Array.new(keys.size - 1,0)
+  positions = Array.new(keys.size - 1,nil)
   header_done = false
 
   IO.foreach(samples[keys.shift][:full]) do |first_file_line|
@@ -259,20 +259,22 @@ File.open("#{output_base}","w") do |out|
     new_line = first_file_line.chomp.split(/\t/) # we always start the first columns of first
     new_line[1] = new_line[1].to_i if header_done
     keys.each_with_index do |k,i|
-      File.open(samples[k][:full]) do |fin|
-        fin.seek(positions[i],IO::SEEK_SET)
+      fin = positions[i] ||= File.open(samples[k][:full])
+      # File.open(samples[k][:full]) do |fin|
+        # fin.seek(positions[i],IO::SEEK_SET)
         (target,depth,avg,data) = fin.readline.chomp.split(/\t/)
-        positions[i] = fin.pos
+        # positions[i] = fin.pos
         depth = depth.to_i
         new_line[1] += depth if header_done
         new_line << data
-      end
+      # end
     end
     
     new_line[2] = new_line[1].to_f/samples.keys.size if header_done
     out.puts new_line.join("\t")
     header_done = true
   end
+  positions.each {|f| f.close}
 
 end
 
