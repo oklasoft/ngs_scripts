@@ -250,40 +250,29 @@ File.open("#{output_base}","w") do |out|
   total_depth = []
   target_lines = []
   
-  samples.keys.each_with_index do |sample,i|
-    print "."
-    IO.foreach(samples[sample][:full]) do |line|
-      parts = line.chomp.split(/\t/)
-      if 1 == $. then
-        # header, if first line all, if not first toss first three columns
-        if 0 != i then
-          parts.shift
-          parts.shift
-          parts.shift
-        end
-        header += parts
-      else
-        # data lines
-        target = parts.shift
-        depth = parts.shift.to_i
-        average = parts.shift.to_f
-        if 0 == i then
-          targets << target
-          total_depth << depth
-          target_lines << parts
-        else
-          index = $. - 2
-          total_depth[index] += depth
-          target_lines[index] += parts
-        end  # if first
-      end # if header
-    end #each line
-  end #each sample
-  puts ""
+  keys = samples.keys
+  positions = Array.new(keys.size - 1,0)
+  header_done = false
 
-  out.puts header.join("\t")
-  targets.each_with_index do |t,i|
-    out.puts "#{t}\t#{total_depth[i]}\t#{total_depth[i].to_f/samples.keys.size}\t#{target_lines[i].join("\t")}"
-  end  
+  IO.foreach(samples[keys.shift][:full]) do |first_file_line|
+    print "." if (0 == $. % 100000)
+    new_line = first_file_line.chomp.split(/\t/) # we always start the first columns of first
+    new_line[1] = new_line[1].to_i if header_done
+    keys.each_with_index do |k,i|
+      File.open(samples[k][:full]) do |fin|
+        fin.seek(positions[i],IO::SEEK_SET)
+        (target,depth,avg,data) = fin.readline.chomp.split(/\t/)
+        positions[i] = fin.pos
+        depth = depth.to_i
+        new_line[1] += depth if header_done
+        new_line << data
+      end
+    end
+    
+    new_line[2] = new_line[1].to_f/samples.keys.size if header_done
+    out.puts new_line.join("\t")
+    header_done = true
+  end
+
 end
 
