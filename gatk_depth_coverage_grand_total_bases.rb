@@ -36,28 +36,19 @@ total = 0
 totals = Hash.new(0)
 samples = []
 
-input = nil
-if ARGV.size > 0 then
-  input = File.open(ARGV.shift)
-else
-  input = $stdin
-end
-
-parts = input.readline.chomp.split(/\t/)
+parts = ARGF.readline.chomp.split(/\t/)
 parts[FIRST_SAMPLE_INDEX,parts.size].each do |sample|
   sample.sub!(/Depth_for_/,'')
   samples << sample.to_sym
 end
 
-input.each_line do |line|
+ARGF.each_line do |line|
   parts = line.chomp.split(/\t/)
   total += parts[TOTAL_INDEX].to_i
   samples.each_with_index do |sample,i|
     totals[sample] += parts[i+FIRST_SAMPLE_INDEX].to_i
   end
 end
-
-input.close
 
 puts "Sample\tTotal Bases"
 samples.each do |sample|
