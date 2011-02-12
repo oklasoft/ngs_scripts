@@ -36,7 +36,14 @@ total = 0
 totals = Hash.new(0)
 samples = []
 
-IO.foreach(ARGV.shift) do |line|
+input = nil
+if ARGV.size > 0 then
+  input = File.open(ARGV.shift)
+else
+  input = $stdin
+end
+
+input.each_line do |line|
   parts = line.chomp.split(/\t/)
   
   if 1 == $.
@@ -51,6 +58,8 @@ IO.foreach(ARGV.shift) do |line|
     end
   end
 end
+
+input.close
 
 puts "Sample\tTotal Bases"
 samples.each do |sample|
