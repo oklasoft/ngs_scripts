@@ -51,14 +51,10 @@ end
 
 input.each_line do |line|
   parts = line.chomp.split(/\t/)
-  
-  # if 1 == $.
-  # else
-    total += parts[TOTAL_INDEX].to_i
-    samples.each_with_index do |sample,i|
-      totals[sample] += parts[i+FIRST_SAMPLE_INDEX].to_i
-    end
-  # end
+  total += parts[TOTAL_INDEX].to_i
+  samples.each_with_index do |sample,i|
+    totals[sample] += parts[i+FIRST_SAMPLE_INDEX].to_i
+  end
 end
 
 input.close
