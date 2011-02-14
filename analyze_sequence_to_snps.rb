@@ -520,7 +520,7 @@ module load samtools/0.1.12
 module unload picard
 module load picard/1.36
 module unload gatk
-module load gatk/1.0.4905
+module load gatk/1.0.5083
 module unload fastqc
 module load fastqc/0.7.2
 module unload tabix
@@ -585,13 +585,13 @@ fi
 
 # Since bwa right now doesn't add read group info correctly (it is not doing it for unmapped), manually add read group
 <%=
-  # fix_sam_read_group(@sample_name,@data)
+  fix_sam_read_group(@sample_name,@data)
 %>
 
-# if [ "$?" -ne "0" ]; then
-#   echo -e "Failure with SAM RG fix"
-#   exit 1
-# fi
+if [ "$?" -ne "0" ]; then
+ echo -e "Failure with SAM RG fix"
+ exit 1
+fi
 
 # Going forward let us play with BAM files
 mkdir 03_first_bam
@@ -684,8 +684,8 @@ mkdir qc
 qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
 
 # Finally call individuals indels & snps
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_indels gatk -T UnifiedGenotyper -glm DINDEL -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_indels.vcf
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_snps gatk -T UnifiedGenotyper -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_snps.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0
+qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_indels gatk -T UnifiedGenotyper -nt 6 -glm DINDEL -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_indels.vcf
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_snps gatk -T UnifiedGenotyper -nt 6 -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_snps.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0
 
 if [ "$?" -ne "0" ]; then
  echo -e Failure
