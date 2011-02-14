@@ -514,7 +514,7 @@ __END__
 
 # be sure to start with a fresh & known enviroment (hopefully)
 module unload bwa
-module load bwa/0.5.9rc1
+module load bwa/0.5.9
 module unload samtools
 module load samtools/0.1.12
 module unload picard
@@ -585,13 +585,13 @@ fi
 
 # Since bwa right now doesn't add read group info correctly (it is not doing it for unmapped), manually add read group
 <%=
-  fix_sam_read_group(@sample_name,@data)
+  # fix_sam_read_group(@sample_name,@data)
 %>
 
- if [ "$?" -ne "0" ]; then
-   echo -e "Failure with SAM RG fix"
-   exit 1
- fi
+# if [ "$?" -ne "0" ]; then
+#   echo -e "Failure with SAM RG fix"
+#   exit 1
+# fi
 
 # Going forward let us play with BAM files
 mkdir 03_first_bam
