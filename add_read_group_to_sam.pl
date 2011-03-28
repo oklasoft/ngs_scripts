@@ -4,6 +4,7 @@
 #
 #
 # Kim Brugger (22 Jul 2010), contact: kim.brugger@easih.ac.uk
+# http://seqanswers.com/forums/showthread.php?t=4180
 
 use strict;
 use warnings;
