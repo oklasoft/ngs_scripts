@@ -322,8 +322,8 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "1.0.2"
-  REVISION_DATE = "2011-04-19"
+  VERSION       = "1.0.3"
+  REVISION_DATE = "2011-04-20"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2011 Oklahoma Medical Research Foundation"
   
@@ -529,7 +529,7 @@ module load samtools/0.1.12
 module unload picard
 module load picard/1.36
 module unload gatk
-module load gatk/1.0.5315
+module load gatk/1.0.5506
 module unload fastqc
 module load fastqc/0.7.2
 module unload tabix
@@ -665,7 +665,7 @@ fi
 
 # Now realign & fix any mate info
 mkdir 07_realigned_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure with indel realigmnent"
