@@ -574,7 +574,7 @@ fi
 
 # Prep all those reads for alignment with bwa aln 
 mkdir 01_bwa_aln_sai
-qsub -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_sam_inputs() %>
+qsub -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_sam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
@@ -693,8 +693,8 @@ mkdir qc
 qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
 
 # Finally call individuals indels & snps
-qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_indels gatk -et NO_ET -T UnifiedGenotyper -nt 6 -glm DINDEL -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_indels.vcf <%= opt_d_rod_path(@data) %>
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_snps gatk -et NO_ET -T UnifiedGenotyper -nt 6 -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_snps.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
+qsub -pe threaded 6 -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_indels gatk -et NO_ET -T UnifiedGenotyper -nt 6 -glm DINDEL -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_indels.vcf <%= opt_d_rod_path(@data) %>
+qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_snps gatk -et NO_ET -T UnifiedGenotyper -nt 6 -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_snps.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
 
 if [ "$?" -ne "0" ]; then
  echo -e Failure
