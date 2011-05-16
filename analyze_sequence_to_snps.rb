@@ -529,7 +529,7 @@ module load samtools/0.1.12
 module unload picard
 module load picard/1.36
 module unload gatk
-module load gatk/1.0.5506
+module load gatk/1.0.5777
 module unload fastqc
 module load fastqc/0.7.2
 module unload tabix
@@ -693,8 +693,7 @@ mkdir qc
 qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
 
 # Finally call individuals indels & snps
-qsub -pe threaded 6 -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_indels gatk -et NO_ET -T UnifiedGenotyper -nt 6 -glm DINDEL -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_indels.vcf <%= opt_d_rod_path(@data) %>
-qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_snps gatk -et NO_ET -T UnifiedGenotyper -nt 6 -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_snps.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
+qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_variants gatk -et NO_ET -T UnifiedGenotyper -nt 6 -R ${GATK_REF} -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_variants.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
 
 if [ "$?" -ne "0" ]; then
  echo -e Failure
