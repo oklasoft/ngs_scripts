@@ -289,7 +289,7 @@ class AnalysisTemplate
 
     rm ./10_recalibrated_bam/recalibrated.bam && mv ./10_recalibrated_bam/recalibrated-sorted.bam ./10_recalibrated_bam/recalibrated.bam
 
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bam.bai
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bai
 
 
     mkdir 11_calibated_covariates
@@ -306,7 +306,7 @@ class AnalysisTemplate
     mkdir 13_final_bam
     # resort & index that bam
     qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai  
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai  
   EOF
     ).result(binding)
   end
@@ -647,7 +647,7 @@ if [ "$?" -ne "0" ]; then
   exit 1
 fi
 
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bam.bai
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
 
 if [ "$?" -ne "0" ]; then                                                                                                                                                                                            
  echo -e "Failure indexing duplicate marked bam"                                                                                                                                                                       
