@@ -86,7 +86,7 @@ Dir.chdir(@options.output_base) do
       output_file = File.join(Dir.pwd,"#{name_base}_#{slice}_variants.vcf")
       input_file = File.join(Dir.pwd,sliced_interval_file)
 
-      cmd = "qsub -m e -pe threaded 4 -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
+      cmd = "qsub -m e -pe threaded 6 -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 6 \
 -R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \
 -I #{@options.bam_list} \
