@@ -67,6 +67,7 @@ Dir.chdir(@options.output_base) do
   puts "Scatter/Gather Variants Starting #{$$}"
   work_dir = "#{Time.now.strftime("%Y%m%d")}_scatter_gather_work.#{$$}"
   raise "Can't make work dir" unless Dir.mkdir(work_dir)
+  to_joins = []
   Dir.chdir(work_dir) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
     lines = IO.readlines(@options.interval_list).map {|l| l.chomp}
@@ -81,18 +82,40 @@ Dir.chdir(@options.output_base) do
       File.open(sliced_interval_file,"w") do |f|
         f.puts sliced_intervals.join("\n")
       end
-      cmd = "
-qsub -m e -pe threaded 6 -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
+
+      output_file = File.join(Dir.pwd,"#{name_base}_#{slice}_variants.vcf")
+      input_file = File.join(Dir.pwd,sliced_interval_file)
+
+      cmd = "qsub -m e -pe threaded 4 -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 6 \
 -R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \
 -I #{@options.bam_list} \
--o #{name_base}_#{slice}_variants.vcf \
+-o #{output_file} \
 -D /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod \
--I #{File.join(Dir.pwd,sliced_interval_file)}"
+-I #{input_file}"
       puts cmd
       system cmd
       sleep(10)
       slice = slice.to_i + 1
-    end
+      
+      to_joins << "-B:#{input_file},VCF #{output_file}"
+    end #each slice
   end #work_dir
+
+  cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \
+gatk -et NO_ET -T CombineVariants \
+-variantMergeOptions UNION \
+-genotypeMergeOptions UNSORTED \
+-R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \
+-o #{name_base}_variants.vcf \
+#{to_joins.join(" ")}
+"
+  File.open("#{work_dir}-joiner.sh","w") do |f|
+    f.puts "#!/usr/bin/env bash"
+    f.puts
+    f.puts "module load sge"
+    f.puts "module load gatk"
+    f.puts cmd
+  end
+  
 end #base_dir
