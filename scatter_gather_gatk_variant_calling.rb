@@ -94,11 +94,11 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 6 \
 -D /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod \
 -L #{input_file}"
       puts cmd
-      system cmd
-      sleep(10)
+      # system cmd
+      # sleep(10)
       slice = slice.to_i + 1
       
-      to_joins << "-B:#{input_file},VCF #{output_file}"
+      to_joins << "-B:#{File.basename(input_file)},VCF #{output_file}"
     end #each slice
   end #work_dir
 
