@@ -47,7 +47,7 @@ unless input_vcf then
   exit 1
 end
 
-input_vcf = File.realpath(input_vcf)
+input_vcf = File.expand_path(input_vcf)
 
 unless File.readable?(input_vcf)
   STDERR.puts "The input VCF file is not actually readable"
