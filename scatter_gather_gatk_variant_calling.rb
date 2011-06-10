@@ -52,6 +52,14 @@ class Interval
     @stop - @start
   end
   
+  def split
+    mid = (((@stop-@start).abs)/2) + @start
+    if mid <= @start || mid >= @stop || mid+1 >= @stop
+      return self
+    end
+    return [self.class.new(@chr,@start,mid), self.class.new(@chr,mid+1,@stop)]
+  end
+  
   def to_s
     "#{@chr}:#{@start}-#{@stop}"
   end
@@ -65,8 +73,23 @@ class Interval
   end
 end
 
+def normalize_interval_sizes(intervals,max_size)
+  new_intervals = intervals.clone
+  begin
+    new_intervals = new_intervals.map do |i|
+      if i.size > max_size then
+        i.split
+      else
+        i
+      end
+    end.flatten
+  end while new_intervals.detect {|i| i.size > max_size}
+  new_intervals
+end
+
 def sliced_intervals()
-  intervals = Interval.intervals_from_file(@options.interval_list)
+  intervals = normalize_interval_sizes(Interval.intervals_from_file(@options.interval_list),50000)
+  
   intervals_per_scatter = (intervals.size/@options.scatter_limit.to_f).ceil.to_i
   intervals.each_slice(intervals_per_scatter)
 end
