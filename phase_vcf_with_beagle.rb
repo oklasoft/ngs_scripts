@@ -63,7 +63,7 @@ def phase_with_beagle()
   cmd = <<-EOF
   beagle.sh \\
   like=#{BEAGLE_LIKELIHOOD_INPUT}  \\
-  -out=#{BEAGLE_OUTPUT_BASENAME}
+  out=#{BEAGLE_OUTPUT_BASENAME}
 EOF
   run_command(cmd,"Phasing with Beagle Failed")
 end
