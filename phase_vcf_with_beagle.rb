@@ -117,7 +117,7 @@ def main()
     exit 1
   end
 
-  work_dir = File.join(base_dir,"#{Time.now.strftime("%Y%m%d")}_scatter_gather_work.#{$$}")
+  work_dir = File.join(base_dir,"#{Time.now.strftime("%Y%m%d")}_beagle_phase_work.#{$$}")
   raise "Can't make work dir" unless Dir.mkdir(work_dir)
   Dir.chdir(work_dir) do
     produce_likelihood_input_for_beagle(input_vcf,reference)
