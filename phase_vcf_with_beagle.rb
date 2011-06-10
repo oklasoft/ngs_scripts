@@ -70,7 +70,7 @@ end
 
 def uncompress_beagle_ouput()
   %w{phased gprobs}.each do |f|
-    cmd="gunzip #{BEAGLE_OUTPUT_BASENAME}.beagle_output.#{f}.gz"
+    cmd="gunzip #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.#{f}.gz"
     run_command(cmd,"Failed uncompressing #{f}")
   end
 end
@@ -82,9 +82,9 @@ def convert_beagle_to_vcf(input_vcf,reference,output_vcf)
   -R #{reference} \\
   -o #{output_vcf} \\
   -B:variant,VCF #{input_vcf} \\
-  -B:beagleR2,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.beagle_output.r2 \\
-  -B:beaglePhased,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.beagle_output.phased \\
-  -B:beagleProbs,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.beagle_output.gprobs
+  -B:beagleR2,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.r2 \\
+  -B:beaglePhased,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.phased \\
+  -B:beagleProbs,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.gprobs
 EOF
   run_command(cmd,"Failed converting beagle back to VCF")
 end
