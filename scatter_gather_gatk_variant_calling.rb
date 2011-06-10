@@ -40,6 +40,37 @@
 
 require 'ostruct'
 
+class Interval
+  attr_reader :chr, :start, :stop
+  def initialize(chr,start,stop)
+    @chr = chr
+    @start = start.to_i
+    @stop = stop.to_i
+  end
+  
+  def size
+    @stop - @start
+  end
+  
+  def to_s
+    "#{@chr}:#{@start}-#{@stop}"
+  end
+  
+  def self.intervals_from_file(file)
+    res = []
+    IO.foreach(file) do |l|
+      res << self.new(*l.chomp.scan(/(.*):(\d+)-(\d+)/).first)
+    end
+    return res
+  end
+end
+
+def sliced_intervals()
+  intervals = Interval.intervals_from_file(@options.interval_list)
+  intervals_per_scatter = (intervals.size/@options.scatter_limit.to_f).ceil.to_i
+  intervals.each_slice(intervals_per_scatter)
+end
+
 @options = OpenStruct.new(
   :output_base => Dir.pwd,
   :scatter_limit => 100,
@@ -70,10 +101,7 @@ Dir.chdir(@options.output_base) do
   to_joins = []
   Dir.chdir(work_dir) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
-    lines = IO.readlines(@options.interval_list).map {|l| l.chomp}
-    intervals_per_scatter = (lines.size/@options.scatter_limit.to_f).ceil.to_i
-    slice = 0
-    lines.each_slice(intervals_per_scatter) do |sliced_intervals|
+    sliced_intervals().each_with_index do |sliced_intervals,slice|
       slice = slice.to_s.rjust(@options.scatter_limit.to_s.length,"0")
       
       STDERR.puts "#{slice}\t#{sliced_intervals.join("; ")}" if @options.verbose
@@ -95,24 +123,23 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 6 \
 -L #{input_file}"
       puts cmd
       system cmd
-      sleep(8)
-      slice = slice.to_i + 1
-      
+      # sleep(8)
+            
       to_joins << "-B:#{File.basename(input_file)},VCF #{output_file}"
     end #each slice
   end #work_dir
 
-  cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \
-gatk -et NO_ET -T CombineVariants \
--variantMergeOptions UNION \
--genotypeMergeOptions UNSORTED \
--R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \
--o #{name_base}_variants.vcf \
-#{to_joins.join(" ")}
+  cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
+gatk -et NO_ET -T CombineVariants \\
+-variantMergeOptions UNION \\
+-genotypeMergeOptions UNSORTED \\
+-R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \\
+-o #{name_base}_variants.vcf \\
+#{to_joins.join(" \\\n")}
 "
   File.open("#{work_dir}-joiner.sh","w") do |f|
     f.puts "#!/usr/bin/env bash"
-    f.puts
+    f.puts "source /etc/profile.d/*.sh"
     f.puts "module load sge"
     f.puts "module load gatk"
     f.puts cmd
