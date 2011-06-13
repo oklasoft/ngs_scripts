@@ -88,7 +88,7 @@ def normalize_interval_sizes(intervals,max_size)
 end
 
 def sliced_intervals()
-  intervals = normalize_interval_sizes(Interval.intervals_from_file(@options.interval_list),50000)
+  intervals = normalize_interval_sizes(Interval.intervals_from_file(@options.interval_list),5000)
   
   intervals_per_scatter = (intervals.size/@options.scatter_limit.to_f).ceil.to_i
   intervals.each_slice(intervals_per_scatter)
@@ -137,8 +137,8 @@ Dir.chdir(@options.output_base) do
       output_file = File.join(Dir.pwd,"#{name_base}_#{slice}_variants.vcf")
       input_file = File.join(Dir.pwd,sliced_interval_file)
 
-      cmd = "qsub -m e -pe threaded 6 -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
-gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 6 \
+      cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
+gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
 -R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \
 -I #{@options.bam_list} \
 -o #{output_file} \
