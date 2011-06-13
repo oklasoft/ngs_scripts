@@ -95,7 +95,7 @@ def main()
     (chr,start,stop,name) = locus_line.chomp.split(/\s+/)
     STDERR.puts "Splitting some stuff out for #{name} in #{chr}:#{start}-#{stop}"
     
-    output_vcf = File.join(output_base,"#{File.basename(file,extension)}-#{name}#{extension}")
+    output_vcf = File.join(output_base,"#{File.basename(file,extension)}-#{name}")
     if File.exist?(output_vcf) then
       STDERR.puts "A file with the output name we would use (#{output_vcf}) already exists. I won't overwrite"
       exit 1
