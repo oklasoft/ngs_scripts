@@ -67,6 +67,7 @@ def get_input_file(arg,name)
   file = arg
   unless file then
     STDERR.puts "Missing input #{name} file"
+    STDERR.puts "Usage: #{__FILE__} <INPUT_VCF> <FILE_OF_LOCI> [BASE_OUTPUT_DIR]"
     exit 1
   end
 
@@ -95,10 +96,14 @@ def main()
     (chr,start,stop,name) = locus_line.chomp.split(/\s+/)
     STDERR.puts "Splitting some stuff out for #{name} in #{chr}:#{start}-#{stop}"
     
-    output_vcf = File.join(output_base,"#{File.basename(file,extension)}-#{name}")
+    output_vcf = File.join(output_base,name,"#{File.basename(file,extension)}-#{name}")
     if File.exist?(output_vcf) then
       STDERR.puts "A file with the output name we would use (#{output_vcf}) already exists. I won't overwrite"
       exit 1
+    end
+
+    unless Dir.mkdir(File.join(output_base,name))
+      STDERR.puts "Failed to make the output dir for #{name} in #{output_base}"
     end
     
     subset_vcf_to_vcf_around(input_vcf,output_vcf,chr,start,stop)
