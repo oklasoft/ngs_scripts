@@ -66,14 +66,14 @@ end
 def get_input_file(arg,name)
   file = arg
   unless file then
-    STDERR.puts "Missing input #{name} file"
+    STDERR.puts "Missing argument #{name} file"
     STDERR.puts "Usage: #{__FILE__} <INPUT_VCF> <FILE_OF_LOCI> [BASE_OUTPUT_DIR]"
     exit 1
   end
 
   file = File.expand_path(file)
   unless File.readable?(file)
-    STDERR.puts "The input #{name} file is not actually readable"
+    STDERR.puts "The #{name} file is not actually readable"
     exit 1
   end  
   return file
