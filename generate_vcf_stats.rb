@@ -170,15 +170,46 @@ class VcfStatGeneratorApp
   end #vcf_data_lines
   
   
+  # Translate the variant we find in this data to some semblance of a bed record
+  # which is written to that output stream
+  # According to a conversation 20110622 with Graham Wiley
+  # SNPS start is vcf position - 1 end is vcf position
+  # Inserts start is vcf position end vcf position + 1
+  # Deletets start is vcf position + 1 end is vcf position + # deleted
   def vcf_data_to_bed_if_bed(vcf_data,out)
     return unless vcf_data && vcf_data[:chr] && vcf_data[:pos]
     result = []
-    result << vcf_data[:chr].sub(/chr/i,'')
-    result << vcf_data[:pos].to_i - 1
-    result << "TODO"
+    result << vcf_data[:chr].sub(/^(?!chr)/i,'chr')
+    case variant_type(vcf_data)
+      when :snp
+        result << vcf_data[:pos].to_i - 1
+        result << vcf_data[:pos].to_i
+      when :insertion
+        result << vcf_data[:pos].to_i
+        result << vcf_data[:pos].to_i + 1        
+      when :deletion
+        result << vcf_data[:pos].to_i + 1
+        result << vcf_data[:pos].to_i + vcf_data[:ref].length - 1
+    end
     result << "#{vcf_data[:ref]}/#{vcf_data[:alt]}"
     #chr start end ref/alt
     out.puts result.join("\t")
+  end
+  
+  def variant_type(vcf_data)
+    if vcf_data[:ref].length > 1 && vcf_data[:alt].length > 1
+      raise ArgumentError, "Unknown variant type for: #{vcf_data}"
+    end
+    if vcf_data[:ref].length > 1
+      return :deletion
+    end
+    if vcf_data[:alt].length > 1
+      return :insertion
+    end
+    if vcf_data[:ref].length == 1 && vcf_data[:alt].length == 1
+      return :snp
+    end
+    raise ArgumentError, "Unknown variant type for: #{vcf_data}"    
   end
   
   # Call vcf-stats on the VCF saving those stats
@@ -194,8 +225,21 @@ class VcfStatGeneratorApp
   #
   def produce_vcf_stats(vcf_path,base_dir,new_prefix)
     @error_message = "Some trouble calling vcf-stats"
+    cmd = "vcf-stats #{vcf_path} > #{File.join(base_dir,"#{new_prefix}_summary.txt 2>/dev/null")}"
+    if 0 == run_external_command(cmd) 
+      return true
+    end
     return false
   end #make_bed
+  
+  def run_external_command(cmd,msg="Command failed")
+    unless system(cmd)
+      @error_message = "#{msg}: #{$?}"
+      return $?.exitstatus
+    end
+    return 0
+  end
+  
   
   # Find some allele freqs & report them, as a whole & within tracks of interest
   #
