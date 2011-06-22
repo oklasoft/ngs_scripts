@@ -175,7 +175,7 @@ class VcfStatGeneratorApp
     result = []
     result << vcf_data[:chr].sub(/chr/i,'')
     result << vcf_data[:pos].to_i - 1
-    result << "end"
+    result << "TODO"
     result << "#{vcf_data[:ref]}/#{vcf_data[:alt]}"
     #chr start end ref/alt
     out.puts result.join("\t")
