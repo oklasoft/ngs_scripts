@@ -305,6 +305,7 @@ class VcfStatGeneratorApp
   def produce_allele_frequency_info(vcf_path,base_dir,new_prefix)
     @error_message = "Some trouble calculating allele frequencies"
     @frequency_accumulators.each do |name, settings|
+      @stderr.puts "LOG: #{new_prefix} against #{name}"
       settings[:loci][new_prefix] = accum()
       new_tmp_path = File.join(Dir.tmpdir,"#{$$}-#{new_prefix}-#{name}")
       cmd = "vcftools --vcf #{vcf_path} --bed #{settings[:path]} --keep-INFO-all --recode --out  #{new_tmp_path} >/dev/null"
@@ -332,13 +333,13 @@ class VcfStatGeneratorApp
     end
     @frequency_accumulators.each do |name,settings|
       settings[:loci].each do |l,ac|
-        puts "#{name}:#{l}"
+        puts "#{l}\t#{name}"
         ac.each do |bin,count|
           puts "\t#{bin[1]}\t#{count}"
         end
       end
     end
-    return false
+    return true
   end #make_bed
   
   
