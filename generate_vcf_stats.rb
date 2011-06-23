@@ -8,7 +8,8 @@
 # Quick script to take soem number of VCFs and produce some stats for them.
 # These stats include the vcf-stat output, a bed file, then some minor allele
 # frequency information. We also intersect each with option UCSC style tracks
-# of interest for the allele frequencying 
+# of interest for the allele frequencying to get it as a whole & within each
+# VCF
 #
 # == Inputs
 #  - A file listing a name & pointer the the bed file for an interest region
@@ -89,6 +90,11 @@ class VcfStatGeneratorApp
       exit(1)
     end
 
+    unless setup_allele_frequency_accumulators()
+      @stderr.puts "Error loading the tracks file: #{@error_message}"
+      exit 1
+    end
+    
     @options.input_files.each do |vcf_path|
       unless process_vcf(vcf_path)
         @stderr.puts "Error processing #{vcf_path}: #{@error_message}"
@@ -99,6 +105,50 @@ class VcfStatGeneratorApp
   
   
   private
+  
+  # Read in the tracks of interest file & set up variables to track their
+  # allele frequency info
+  #
+  # * *Args*    :
+  #   - ++ -
+  # * *Returns* :
+  #   - false on problems, true on goodness
+  # * *Raises* :
+  #  - +Exception+ -
+  #
+  def setup_allele_frequency_accumulators()
+    return true unless @options.tracks_file
+    @frequency_accumulators = {}
+    IO.foreach(@options.tracks_file) do |line|
+      (name,path) = line.chomp.split(/\t/)
+      unless name && path
+        @error_message = "Error parsing #{@options.tracks_file}, incorrect number of fields near #{$.}"
+        return false
+      end
+      @frequency_accumulators[name.to_sym] = {:path => path, 
+        :loci => {}
+      }
+      unless File.readable?(path)
+        @error_message = "The bed file to be used by #{name} at #{path} is not readable"
+        return false
+      end
+    end
+    return true
+  end #setup_allele_frequency_accumulators
+  
+  def accum
+    {
+      [lambda {|f| f > 0.4},"greater than 0.4"]  => 0,
+      [lambda {|f| f <= 0.4 && f > 0.3},"greater than 0.3"]  => 0,
+      [lambda {|f| f <= 0.3 && f > 0.2},"greater than 0.2"]  => 0,
+      [lambda {|f| f <= 0.2 && f > 0.1},"greater than 0.1"]  => 0,
+      [lambda {|f| f <= 0.1 && f > 0.08},"greater than 0.08"]  => 0,
+      [lambda {|f| f <= 0.08 && f > 0.06},"greater than 0.06"]  => 0,
+      [lambda {|f| f <= 0.06 && f > 0.04},"greater than 0.04"]  => 0,
+      [lambda {|f| f <= 0.04 && f > 0.02},"greater than 0.02"]  => 0,
+      [lambda {|f| f <= 0.02 && f > 0},"greater than 0"]  => 0
+    }.dup
+  end
   
   # Does all the work for a vcf
   # Produces a basic bed file, makes intersections with tracks of interests,
@@ -119,9 +169,9 @@ class VcfStatGeneratorApp
     new_file_prefix = vcf_file_name_prefix(vcf_path)
     return false if nil == new_file_prefix 
 
-    return false unless make_bed(vcf_path,base_output_dir,new_file_prefix)
-    
-    return false unless produce_vcf_stats(vcf_path,base_output_dir,new_file_prefix)
+    # return false unless make_bed(vcf_path,base_output_dir,new_file_prefix)
+    # 
+    # return false unless produce_vcf_stats(vcf_path,base_output_dir,new_file_prefix)
     
     return false unless produce_allele_frequency_info(vcf_path,base_output_dir,new_file_prefix)
 
@@ -241,7 +291,7 @@ class VcfStatGeneratorApp
   end
   
   
-  # Find some allele freqs & report them, as a whole & within tracks of interest
+  # Find some allele freqs within tracks of interest save them & accumulate them
   #
   # * *Args*    :
   #   - +vcf_path+ - Input VCF file path
@@ -254,6 +304,40 @@ class VcfStatGeneratorApp
   #
   def produce_allele_frequency_info(vcf_path,base_dir,new_prefix)
     @error_message = "Some trouble calculating allele frequencies"
+    @frequency_accumulators.each do |name, settings|
+      settings[:loci][new_prefix] = accum()
+      new_tmp_path = File.join(Dir.tmpdir,"#{$$}-#{new_prefix}-#{name}")
+      cmd = "vcftools --vcf #{vcf_path} --bed #{settings[:path]} --keep-INFO-all --recode --out  #{new_tmp_path} >/dev/null"
+      unless run_external_command(cmd) == 0
+        return false
+      end
+      if File.exist?("#{new_tmp_path}.recode.vcf")
+        vcf_data_lines("#{new_tmp_path}.recode.vcf") do |data|
+          data[:info].split(";").each do |info|
+            if info =~ /^AF=/
+              freq = info.split(/\=/)[-1].to_f
+              freq = 1 - freq if freq > 0.5
+              settings[:loci][new_prefix].each do |bin,count|
+                settings[:loci][new_prefix][bin] += 1 if bin[0].call(freq)
+              end
+              break
+            end
+          end
+        end
+        File.unlink("#{new_tmp_path}.recode.vcf")
+      else
+        @stderr.puts "Nothing left after intersecting #{name} with #{new_prefix}"
+      end
+      File.unlink("#{new_tmp_path}.log")
+    end
+    @frequency_accumulators.each do |name,settings|
+      settings[:loci].each do |l,ac|
+        puts "#{name}:#{l}"
+        ac.each do |bin,count|
+          puts "\t#{bin[1]}\t#{count}"
+        end
+      end
+    end
     return false
   end #make_bed
   
