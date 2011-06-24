@@ -63,6 +63,52 @@ require 'ostruct'
 require 'tempfile'
 require 'fileutils'
 
+class BinningAccumulator
+  
+  attr_reader :accumulations
+  attr_accessor :bin_less
+  
+  def initialize(bins)
+    @accumulations = {}
+    bins.each do |key,test|
+      @accumulations[key] = {:test => test, :sum => 0}
+    end
+    @bin_less = 0
+  end
+  
+  def <<(value)
+    @accumulations.each do |bin_key,bin_data|
+      if bin_data[:test].call(value)
+        @accumulations[bin_key][:sum] += 1
+        return
+      end
+    end
+    @bin_less += 1
+  end
+  
+  def +(other_accum)
+    sum = self.dup
+    other_accum.accumulations.each do |name,data|
+      if sum.accumulations.has_key?(name)
+        sum.accumulations[name][:sum] += data[:sum]
+      else
+        sum.accumulations[name] = data
+      end
+    end
+    sum.bin_less += other_accum.bin_less
+    return sum
+  end
+  
+  def to_s_a
+    a = []
+    @accumulations.each do |name,data|
+      a << "#{name}\t#{data[:sum]}"
+    end
+    a
+  end
+    
+end
+
 class VcfStatGeneratorApp
   VERSION       = "0.0.1-pre01"
   REVISION_DATE = "2011-06-17"
@@ -71,6 +117,18 @@ class VcfStatGeneratorApp
   
   NUM_TRACK_FIELDS = 2
   TRACK_FILES_DELIMITER = /\s+/
+  
+  BINS = {
+    "(0.4,∞]"  => lambda {|f| f > 0.4},
+    "(0.3,0.4]"  => lambda {|f| f <= 0.4 && f > 0.3},
+    "(0.2,0.3]"  => lambda {|f| f <= 0.3 && f > 0.2},
+    "(0.1,0.2]"  => lambda {|f| f <= 0.2 && f > 0.1},
+    "(0.08,0.1]"  => lambda {|f| f <= 0.1 && f > 0.08},
+    "(0.06,0.08]"  => lambda {|f| f <= 0.08 && f > 0.06},
+    "(0.04,0.06]"  => lambda {|f| f <= 0.06 && f > 0.04},
+    "(0.02,0.04]"  => lambda {|f| f <= 0.04 && f > 0.02},
+    "(0,0.02]"  => lambda {|f| f <= 0.02 && f > 0}
+  }
   
   # Create an app object to run
   # * +args+ - Array of command line argument string
@@ -101,6 +159,12 @@ class VcfStatGeneratorApp
         exit 1
       end
     end #each vcf
+    
+    @frequency_accumulators.each do |name,settings|
+      @stdout.puts settings[:accumulator].to_s_a.map{|s| "overall #{name} #{s}"}
+    end
+    
+    
   end #run
   
   
@@ -125,9 +189,7 @@ class VcfStatGeneratorApp
         @error_message = "Error parsing #{@options.tracks_file}, incorrect number of fields near #{$.}"
         return false
       end
-      @frequency_accumulators[name.to_sym] = {:path => path, 
-        :loci => {}
-      }
+      @frequency_accumulators[name.to_sym] = {:path => path, :accumulator => BinningAccumulator.new(BINS)}
       unless File.readable?(path)
         @error_message = "The bed file to be used by #{name} at #{path} is not readable"
         return false
@@ -136,19 +198,6 @@ class VcfStatGeneratorApp
     return true
   end #setup_allele_frequency_accumulators
   
-  def accum
-    {
-      [lambda {|f| f > 0.4},"greater than 0.4"]  => 0,
-      [lambda {|f| f <= 0.4 && f > 0.3},"greater than 0.3"]  => 0,
-      [lambda {|f| f <= 0.3 && f > 0.2},"greater than 0.2"]  => 0,
-      [lambda {|f| f <= 0.2 && f > 0.1},"greater than 0.1"]  => 0,
-      [lambda {|f| f <= 0.1 && f > 0.08},"greater than 0.08"]  => 0,
-      [lambda {|f| f <= 0.08 && f > 0.06},"greater than 0.06"]  => 0,
-      [lambda {|f| f <= 0.06 && f > 0.04},"greater than 0.04"]  => 0,
-      [lambda {|f| f <= 0.04 && f > 0.02},"greater than 0.02"]  => 0,
-      [lambda {|f| f <= 0.02 && f > 0},"greater than 0"]  => 0
-    }.dup
-  end
   
   # Does all the work for a vcf
   # Produces a basic bed file, makes intersections with tracks of interests,
@@ -169,12 +218,12 @@ class VcfStatGeneratorApp
     new_file_prefix = vcf_file_name_prefix(vcf_path)
     return false if nil == new_file_prefix 
 
-    # return false unless make_bed(vcf_path,base_output_dir,new_file_prefix)
-    # 
-    # return false unless produce_vcf_stats(vcf_path,base_output_dir,new_file_prefix)
+    return false unless make_bed(vcf_path,base_output_dir,new_file_prefix)
+    
+    return false unless produce_vcf_stats(vcf_path,base_output_dir,new_file_prefix)
     
     return false unless produce_allele_frequency_info(vcf_path,base_output_dir,new_file_prefix)
-
+    
     return true
   end #process_vcf
   
@@ -305,40 +354,35 @@ class VcfStatGeneratorApp
   def produce_allele_frequency_info(vcf_path,base_dir,new_prefix)
     @error_message = "Some trouble calculating allele frequencies"
     @frequency_accumulators.each do |name, settings|
-      @stderr.puts "LOG: #{new_prefix} against #{name}"
-      settings[:loci][new_prefix] = accum()
+      accum = BinningAccumulator.new(BINS)
+
       new_tmp_path = File.join(Dir.tmpdir,"#{$$}-#{new_prefix}-#{name}")
       cmd = "vcftools --vcf #{vcf_path} --bed #{settings[:path]} --keep-INFO-all --recode --out  #{new_tmp_path} >/dev/null"
       unless run_external_command(cmd) == 0
+        File.unlink("#{new_tmp_path}.log")
         return false
       end
+
       if File.exist?("#{new_tmp_path}.recode.vcf")
+
         vcf_data_lines("#{new_tmp_path}.recode.vcf") do |data|
           data[:info].split(";").each do |info|
             if info =~ /^AF=/
               freq = info.split(/\=/)[-1].to_f
               freq = 1 - freq if freq > 0.5
-              settings[:loci][new_prefix].each do |bin,count|
-                settings[:loci][new_prefix][bin] += 1 if bin[0].call(freq)
-              end
+              accum << freq
               break
             end
           end
         end
         File.unlink("#{new_tmp_path}.recode.vcf")
       else
-        @stderr.puts "Nothing left after intersecting #{name} with #{new_prefix}"
-      end
+        # @stderr.puts "Nothing left after intersecting #{name} with #{new_prefix}"
+      end #if VCF intersect file
       File.unlink("#{new_tmp_path}.log")
-    end
-    @frequency_accumulators.each do |name,settings|
-      settings[:loci].each do |l,ac|
-        puts "#{l}\t#{name}"
-        ac.each do |bin,count|
-          puts "\t#{bin[1]}\t#{count}"
-        end
-      end
-    end
+      settings[:accumulator] += accum
+      @stdout.puts accum.to_s_a.map{|s| "#{new_prefix}\t#{name} #{s}"}
+    end #each intersect type
     return true
   end #make_bed
   
