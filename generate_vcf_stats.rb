@@ -429,9 +429,9 @@ class VcfStatGeneratorApp
   # * +ios+ - Hash with keys of :stdin, :stdout, :stderr
   # Any key not present the correspodning stream will be set the standard
   def set_inputs_outputs(ios)
-    @stdin = ios[:stdin] || STDIN
-    @stdout = ios[:stdout] || STDOUT
-    @stderr = ios[:stderr] || STDERR
+    @stdin = ios[:stdin] || $stdin
+    @stdout = ios[:stdout] || $stdout
+    @stderr = ios[:stderr] || $stderr
   end
   
   # Just make sure the app is happy with some steady & known default options
