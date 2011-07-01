@@ -347,7 +347,7 @@ class VcfToPlink
     @error_message = "Trouble converting impute output to plink file '#{__LINE__}'"
     new_prefix = "#{input_prefix}_imputed"
     cmd=<<-EOF
-gtool -G --g #{new_prefix} --ped #{new_prefix}.ped --map #{new_prefix}.map \
+gtool --log /dev/null -G --g #{new_prefix} --ped #{new_prefix}.ped --map #{new_prefix}.map \
 --phenotype Phenotype \
 --threshold 0.8 \
 --s #{input_sample_file} 2>/dev/null 1>/dev/null
