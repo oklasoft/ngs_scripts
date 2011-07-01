@@ -18,7 +18,7 @@
 # == Usage
 #  generate_vcf_stats.rb -t BED_TRACKS INPUT_VCF(S) 
 #
-#  For help use fix_vcf_generated_ped.rb -h
+#  For help use generate_vcf_stats.rb -h
 #
 # == Options
 #  -h, --help             Display this help message
