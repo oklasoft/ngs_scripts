@@ -223,13 +223,28 @@ class VcfToPlink
       return false
     end
     
-    return create_impute_input(vcf_path,out_path) &&
-    convert_indels_to_ac_snp_in_impute_legend(out_path) &&
-    run_impute(out_path,locus[:start],locus[:stop],hapmap_chromsome_panel_file,population_locus_genotype_file) &&
-    convert_impute_ouput_to_plink(out_path,gtool_sample_file) &&
-    fix_imputed_ped_file("#{out_path}_imputed.ped",imputed_pedigree_template) &&
-    fix_imputed_map_file("#{out_path}_imputed.map",locus[:chr])
+    if create_impute_input(vcf_path,out_path) && convert_indels_to_ac_snp_in_impute_legend(out_path)
+      if run_impute(out_path,locus[:start],locus[:stop],hapmap_chromsome_panel_file,population_locus_genotype_file)
+        return convert_impute_ouput_to_plink(out_path,gtool_sample_file) &&
+          fix_imputed_ped_file("#{out_path}_imputed.ped",imputed_pedigree_template) &&
+          fix_imputed_map_file("#{out_path}_imputed.map",locus[:chr])
+      else
+        @stderr.puts "WARN: #{vcf_path} failed to impute"
+        clean_impute_files(out_path)
+        %w/_impute_legend_indel_changes.txt _imputed_warnings/.each do |ext|
+          File.unlink("#{out_path}#{ext}") if File.exists?("#{out_path}#{ext}")
+        end
+        return true
+      end
+    end
+    return false
   end #impute_vcf
+  
+  def clean_impute_files(input_prefix)
+    %w/_imputed _imputed_info _imputed_info_by_sample .impute.hap .impute.hap.indv .impute.legend/.each do |ext|
+      File.unlink("#{input_prefix}#{ext}") if File.exists?("#{input_prefix}#{ext}")
+    end
+  end
   
   # Attempt to match the filename against our @loci
   #
@@ -354,9 +369,7 @@ gtool --log /dev/null -G --g #{new_prefix} --ped #{new_prefix}.ped --map #{new_p
 EOF
     if 0 == run_external_command(cmd,"gtool")
       # clean up impute files
-      %w/_imputed _imputed_info _imputed_info_by_sample .impute.hap .impute.hap.indv .impute.legend/.each do |ext|
-        File.unlink("#{input_prefix}#{ext}")
-      end
+      clean_impute_files(input_prefix)
       return true
     end
     return false
