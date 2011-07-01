@@ -9,10 +9,12 @@
 # optionally make imputed versions of those based on additional data
 #
 # == Inputs
-#  - A file listing loci info of the target VCF(s) has chr, start, stop & name
-#  - A file listing associated genetic map file locations for each chromosome
-#  - A file listing the correct pedigree template structure
-#  - A base directory contiaing genotype data, named by locus
+#  - A file listing loci info of the target VCF(s): chr start stop name
+#  - A file listing associated genetic map file locations for each chromosome: chr path_to_file
+#  - A file listing the correct template pedigree file for the VCF made ped file
+#  - A base directory contiaing genotype data for impute, named by locus (LOCUS.gen)
+#  - A base directory contiaing sample data for impute, named by locus (LOCUS.sample)
+#    This base dir will also be used to find a pedigree template (LOCUS.ped) to fix the imputed pedigree
 #  - One or more VCFs
 #
 # == Usage
