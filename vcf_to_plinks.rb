@@ -20,7 +20,7 @@
 # == Usage
 #  vcf_to_plink.rb -t PEDIGREE_TEMPLATE -q QC_FILE -i INPUT_VCF(S) 
 #
-#  For help use fix_vcf_generated_ped.rb -h
+#  For help use vcf_to_plink.rb -h
 #
 # == Options
 #  -h, --help             Display this help message
@@ -728,7 +728,7 @@ EOF
       @stderr.puts "Template file '#{@options.template_pedigree}' is not actually readable"
       return false
     end
-    IO.foreach(@options.tracks_file) do |line|
+    IO.foreach(@options.template_pedigree) do |line|
       next if line =~ /^#/
       if 7 == line.split(/\t/).size
         return true
