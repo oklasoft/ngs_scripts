@@ -331,7 +331,7 @@ class VcfToPlink
     File.unlink(ped_file)
     File.rename(tmp_file,ped_file)
     if impute_pedigree_template
-      cmd="fix_vcf_generated_ped.rb -i -t #{impute_pedigree_template} #{ped_file}"
+      cmd="fix_vcf_generated_ped.rb -i .backup -t #{impute_pedigree_template} #{ped_file}"
       if 0 == run_external_command(cmd,"fix_vcf_generated_ped for imputed ped failed (#{cmd})")
         return true
       end
@@ -544,7 +544,7 @@ EOF
   
   def fix_plink_ped(ped_prefix_path)
     return true unless @options.template_pedigree
-    cmd="fix_vcf_generated_ped.rb -i -t #{@options.template_pedigree} #{ped_prefix_path}.ped"
+    cmd="fix_vcf_generated_ped.rb -i .backup -t #{@options.template_pedigree} #{ped_prefix_path}.ped"
     if 0 == run_external_command(cmd,"fix_vcf_generated_ped failed")
       return true
     end
