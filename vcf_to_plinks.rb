@@ -258,7 +258,7 @@ class VcfToPlink
   #
   def find_locus(filename)
     @loci.each do |locus_name,locus_data|
-      if filename =~ /#{locus_name}/
+      if filename =~ /^#{locus_name}$/
         return locus_data
       end
     end
