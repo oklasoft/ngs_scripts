@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby -w -Ku
 #
-# analyze_sequence_to_snps.rb
+# scatter_gather_gatk_variant_calling.rb
 # Created by Stuart Glenn on 2011-06-07
 #
 # == Synopsis
