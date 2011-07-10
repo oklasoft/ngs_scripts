@@ -181,8 +181,8 @@ class VcfStatGeneratorApp
   #  - +Exception+ -
   #
   def setup_allele_frequency_accumulators()
-    return true unless @options.tracks_file
     @frequency_accumulators = {}
+    return true unless @options.tracks_file
     IO.foreach(@options.tracks_file) do |line|
       (name,path) = line.chomp.split(/\t/)
       unless name && path
