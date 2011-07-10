@@ -94,16 +94,18 @@ class VcfToPlink
       exit(1)
     end
     
-    unless load_loci()
-      @stderr.puts "Error loading loci info: #{@error_message}"
-      exit 1
-    end
+    if @options.do_impute
+      unless load_loci()
+        @stderr.puts "Error loading loci info: #{@error_message}"
+        exit 1
+      end
 
-    unless load_genetic_maps()
-      @stderr.puts "Error loading mapping info: #{@error_message}"
-      exit 1
+      unless load_genetic_maps()
+        @stderr.puts "Error loading mapping info: #{@error_message}"
+        exit 1
+      end
     end
-
+    
     had_errors = false
 
     @options.input_files.each do |vcf_path|
