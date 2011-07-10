@@ -158,6 +158,7 @@ class VcfToPlink
   #
   def load_loci()
     @loci = {}
+    return true if nil == @options.loci_file
     IO.foreach(@options.loci_file) do |locus_line|
       next if locus_line =~ /^#/ || locus_line =~ /^$/
       (chr,start,stop,name) = locus_line.chomp.split(/\s+/)
