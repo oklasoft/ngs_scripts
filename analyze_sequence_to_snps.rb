@@ -531,7 +531,7 @@ module load picard/1.36
 module unload gatk
 module load gatk/1.0.5777
 module unload fastqc
-module load fastqc/0.7.2
+module load fastqc/0.9.4
 module unload tabix
 module load tabix/0.2.3
 module unload btangs
