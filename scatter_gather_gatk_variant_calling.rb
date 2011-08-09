@@ -39,6 +39,7 @@
 #
 
 require 'ostruct'
+require 'optparse'
 
 class Interval
   attr_reader :chr, :start, :stop
@@ -47,11 +48,11 @@ class Interval
     @start = start.to_i
     @stop = stop.to_i
   end
-  
+
   def size
     @stop - @start
   end
-  
+
   def split
     mid = (((@stop-@start).abs)/2) + @start
     if mid <= @start || mid >= @stop || mid+1 >= @stop
@@ -59,11 +60,11 @@ class Interval
     end
     return [self.class.new(@chr,@start,mid), self.class.new(@chr,mid+1,@stop)]
   end
-  
+
   def to_s
     "#{@chr}:#{@start}-#{@stop}"
   end
-  
+
   def self.intervals_from_file(file)
     res = []
     IO.foreach(file) do |l|
@@ -89,30 +90,92 @@ end
 
 def sliced_intervals()
   intervals = normalize_interval_sizes(Interval.intervals_from_file(@options.interval_list),5000)
-  
+
   intervals_per_scatter = (intervals.size/@options.scatter_limit.to_f).ceil.to_i
   intervals.each_slice(intervals_per_scatter)
 end
 
-@options = OpenStruct.new(
-  :output_base => Dir.pwd,
-  :scatter_limit => 100,
-  :verbose => true,
-  :bam_list => nil,
-  :interval_list => nil
-)
-
-@options.bam_list = ARGV.shift
-@options.interval_list = ARGV.shift
-@options.output_base = ARGV.shift unless ARGV.empty?
-@options.scatter_limit = ARGV.shift.to_i unless ARGV.empty?
-
-unless @options.bam_list && @options.interval_list
-  STDERR.puts "Need to at least give us a file listing bams & the master intervals"
-  exit 1
+def output_version(out)
+  out.puts "#{File.basename($0)} 1.0"
 end
 
+def output_help(out)
+  out.puts "#{File.basename($0)} -o OUT_DIR -b BAM_LIST -i INTERVAL_LIST -r REF"
+  out.puts ""
+  out.puts <<-EOF
+  -v, --version             Print version info
+  -h, --help                Print this help
+  -V, --verbose             Enable verbosity
+  -D, --deub                Enable debuging
+  -o, --otput DIR           Save output in DIR
+  -i, --interval LIST_FILE  File of intervals
+  -b, --bam_list BAM_LIST   File listing the BAMs
+  -r, --reference FASTQ     Fasta/q reference file against the BAMs were aligned
+  -d, --dbsnp DBSNP         A VCF of SNP info for the UnifiedGenotyper
+  -s, --scatter NUM         Scattering into NUM sub instances, defaults to 100
+  --stand_call_conf VAL     Set stand_call_conf for GATK, defaults to 30.0
+EOF
+end
 
+def parse_opts(args)
+  @options = OpenStruct.new(
+    :output_base => Dir.pwd,
+    :scatter_limit => 100,
+    :stand_call_conf => 30.0,
+    :verbose => false,
+    :debug => false,
+    :bam_list => nil,
+    :interval_list => nil,
+    :reference_path => nil,
+    :snp_path => nil
+  )
+  
+  opts = OptionParser.new() do |o|
+    o.on('-v','--version') { output_version($stdout); exit(0) }
+    o.on('-h','--help') { output_help($stdout); exit(0) }
+    o.on('-V', '--verbose')    { @options.verbose = true }
+    o.on('-D', '--debug')    { @options.debug = true }
+
+    o.on("-o","--output", "=REQUIRED") do |output|
+      @options.output_base = File.expand_path(output)
+    end
+
+    o.on("-s","--scatter", "=REQUIRED") do |scatter|
+      @options.scatter_limit = scatter.to_i
+    end
+
+    o.on("--stand_call_conf", "=REQUIRED") do |conf|
+      @options.stand_call_conf = conf.to_f
+    end
+
+    o.on("-b","--bam_list", "=REQUIRED") do |bam|
+      @options.bam_list = File.expand_path(bam)
+    end
+
+    o.on("-i","--interval", "=REQUIRED") do |interval|
+      @options.interval_list = File.expand_path(interval)
+    end
+
+    o.on("-r","--reference", "=REQUIRED") do |path|
+      @options.reference_path = File.expand_path(path)
+    end
+
+    o.on("-d","--dbsnp", "=REQUIRED") do |path|
+      @options.snp_path = File.expand_path(path)
+    end
+  end
+
+  opts.parse!(args)  
+
+  unless @options.bam_list && @options.interval_list && @options.reference_path
+    $stderr.puts "Need to at least give us a file listing bams & the master intervals & a refernce"
+    $stderr.puts ""
+    output_help($stderr)
+    exit 1
+  end  
+end
+
+parse_opts(ARGV)
 
 STDERR.puts "#{@options}" if @options.verbose
 name_base = File.split(@options.bam_list)[-1]
@@ -126,7 +189,7 @@ Dir.chdir(@options.output_base) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
     sliced_intervals().each_with_index do |sliced_intervals,slice|
       slice = slice.to_s.rjust(@options.scatter_limit.to_s.length,"0")
-      
+
       STDERR.puts "#{slice}\t#{sliced_intervals.join("; ")}" if @options.verbose
 
       sliced_interval_file = "sliced_interval_#{slice}.interval_list"
@@ -136,27 +199,33 @@ Dir.chdir(@options.output_base) do
 
       output_file = File.join(Dir.pwd,"#{name_base}_#{slice}_variants.vcf")
       input_file = File.join(Dir.pwd,sliced_interval_file)
+      
+      snp_opt = if @options.snp_path then
+        "-B:dbsnp,vcf #{@options.snp_path}"
+      else
+        ""
+      end
 
       cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
--R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \
+-A FS -A AlleleBalance \
+-R #{@options.reference_path} #{snp_opt}\
 -I #{@options.bam_list} \
 -o #{output_file} \
--D /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod \
+-stand_call_conf #{@options.stand_call_conf} -stand_emit_conf 10.0 \
 -L #{input_file}"
       puts cmd
       system cmd
       sleep(5)
-            
+
       to_joins << "-B:#{File.basename(input_file)},VCF #{output_file}"
     end #each slice
   end #work_dir
 
   cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
 gatk -et NO_ET -T CombineVariants \\
--variantMergeOptions UNION \\
 -genotypeMergeOptions UNSORTED \\
--R /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta \\
+-R #{@options.reference_path} \\
 -o #{name_base}_variants.vcf \\
 #{to_joins.join(" \\\n")}
 "
@@ -164,8 +233,8 @@ gatk -et NO_ET -T CombineVariants \\
     f.puts "#!/usr/bin/env bash"
     f.puts "source /etc/profile.d/*.sh"
     f.puts "module load sge"
-    f.puts "module load gatk"
+    f.puts "module load gatk/1.1"
     f.puts cmd
   end
-  
+
 end #base_dir

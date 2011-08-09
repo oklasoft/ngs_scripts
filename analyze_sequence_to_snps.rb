@@ -11,16 +11,16 @@
 # The actual input to this script is just an job config file, which is used
 # to easily specify all the parameters for many samples in on place. Future
 # released might allow for single sample runs without the config file but for
-# right now it is not a priority as we do analysis in bulk 
+# right now it is not a priority as we do analysis in bulk
 #
 # === Config File
 # At this point the config file is a YAML hash of hashes. The hash is as follows
 #
 # {sample_id:  {is_paired: true/false, run: name, lane: number, :inputs: [fastq1,fastq2]}}
-# 
+#
 # It can also have a DEFAULT key with {bwa_ref: path_to_ref, gatk_ref: path_to_ref, snp_rod: path_to_rod}
 # Those reference keys can be in each sample to override, if :snp_rod is missing we'll skip the covariate recalibration
-# 
+#
 #
 # == Usage
 #  analyze_sequence_to_snps.rb PATH_TO_CONFIG.YML PATH_TO_BASE_OUTPUT_DIR SAMPLE_ID [SAMPLE_ID]
@@ -71,7 +71,7 @@ require 'ostruct'
 
 
 class AnalysisTemplate
-  
+
   # Create instance
   # *+default_config+ - Default options
   # *+sample_name+ - Name of this sample
@@ -81,7 +81,7 @@ class AnalysisTemplate
     @sample_name = sample_name
     @data = data
   end #initialize(default_config,sample_name,data)
-  
+
   def fastq_file_list(sample_name,data)
     fastqs = []
     @fastq_shell_vars = {}
@@ -170,7 +170,7 @@ class AnalysisTemplate
         cmd += " 00_inputs/#{index}.bam"
       end
     end
-    return cmd  
+    return cmd
   end
 
   def create_original_sam_inputs(sample_name,data)
@@ -189,7 +189,7 @@ class AnalysisTemplate
         cmd += " ${#{v}}"
       end
     end
-    return cmd  
+    return cmd
   end
 
   def fix_sam_read_group(sample_name,data)
@@ -198,7 +198,7 @@ class AnalysisTemplate
       # rg
       cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}"
     end
-    return cmd  
+    return cmd
   end
 
   def default_rg(sample_name,data)
@@ -234,10 +234,16 @@ class AnalysisTemplate
   # output a -D SNP rod file, if we have a snp_rod
   def opt_d_rod_path(data)
     if data.first[:snp_rod] || @default_config[:snp_rod]
-      "-D ${GATK_DBSNP}"
+      if data.first[:snp_rod] =~ /\.rod$/ || @default_config[:snp_rod] =~ /\.rod$/
+        "-D ${GATK_DBSNP}"
+      elsif data.first[:snp_rod] =~ /\.vcf(\.gz)?$/ || @default_config[:snp_rod] =~ /\.vcf(\.gz)?$/
+        "-B:dbsnp,VCF ${GATK_DBSNP}"
+      else
+        raise "Unknown file format for SNP ROD"
+      end
     else
       ""
-    end    
+    end
   end
 
   def covariate_or_final(sample_name,data)
@@ -261,8 +267,8 @@ class AnalysisTemplate
     # HERE
 
     mkdir 08_uncalibated_covariates
-    # recalibration 
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -D ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
+    # recalibration
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -293,7 +299,7 @@ class AnalysisTemplate
 
 
     mkdir 11_calibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -D ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting calibrated covariates"
@@ -306,9 +312,140 @@ class AnalysisTemplate
     mkdir 13_final_bam
     # resort & index that bam
     qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai  
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
+  end
+
+  # format out the -B options for gatk based on the vqsr data
+  def vqsr_training_data_gatk_opts(vqsr_data)
+    vqsr_data[:training_sets].map do |set|
+      "-B:#{set[:name]},#{set[:type]},#{set[:params]} #{set[:path]}"
+    end.join(" ") + " " +
+    vqsr_data[:annotations].map do |an|
+      "-an #{an}"
+    end.join(" ")
+  end
+
+  # using the vqsr options make up some commands to recalibation variant
+  # quality scores
+  # will do a bunch of stuff
+  def variant_quality_score_recalibration(sample_name,data)
+    vqsr_data = data.first[:vqsr] || @default_config[:vqsr]
+    ERB.new(<<-EOF
+    # VQSR
+
+    # make or work dir & organize our input
+    mkdir 14_vqsr
+
+    # filters we will use later
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variant_filtration \\
+    gatk -et NO_ET -T VariantFiltration \\
+    -R ${GATK_REF} \\
+    -o 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf  \\
+    -B:variant,VCF <%= sample_name %>_variants.vcf \\
+    --filterExpression "\\"MQ0 >= 4 && ((MQ0 / (1.0 * DP)) > 0.1)\\"" \\
+    --filterName "\\"HARD_TO_VALIDATE"\\"
+
+    if [ "$?" -ne "0" ]; then
+     echo -e Failure
+     exit 1
+    fi
+
+    # call VariantRecalibrator
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_recalibrate gatk \\
+    -T VariantRecalibrator -et NO_ET \\
+    -R ${GATK_REF} <%= vqsr_training_data_gatk_opts(vqsr_data) %> \\
+    -B:input,VCF 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf \\
+    -recalFile 14_vqsr/<%= sample_name %>.recal \\
+    -tranchesFile 14_vqsr/<%= sample_name %>.tranches \\
+    -rscriptFile 14_vqsr/<%= sample_name %>_plots.R \\
+    --ignore_filter LowQual \\
+    --ignore_filter HARD_TO_VALIDATE \\
+    --maxGaussians 4
+
+    if [ "$?" -ne "0" ]; then
+     echo -e Failure
+     exit 1
+    fi
+
+    # plot the graphs of the model info
+    R CMD BATCH 14_vqsr/<%= sample_name %>_plots.R logs/<%= sample_name %>_plots.Rout
+
+    if [ "$?" -ne "0" ]; then
+     echo -e Failure
+     exit 1
+    fi
+
+    # we need to get rid of the original one
+    rm -f <%= sample_name %>_variants.vcf*
+
+    # call ApplyRecalibration
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_apply \\
+    gatk -T ApplyRecalibration -R ${GATK_REF} \\
+    -B:input,VCF 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf \\
+    --ts_filter_level 99.0 \\
+    -recalFile 14_vqsr/<%= sample_name %>.recal \\
+    -tranchesFile 14_vqsr/<%= sample_name %>.tranches \\
+    -resources ${GATK_BASE}/resources \\
+    -o <%= sample_name %>_variants.vcf
+
+   if [ "$?" -ne "0" ]; then
+    echo -e Failure
+    exit 1
+   fi
+
+    # clean up vqsr data
+    rm -f 14_vqsr/<%= sample_name %>_plots.R \\
+    14_vqsr/<%= sample_name %>.tranches \\
+    14_vqsr/<%= sample_name %>.recal
+
+    bgzip 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf
+
+
+  EOF
+    ).result(binding)
+  end
+
+  # check if we have the options for doing vsqr on the VCF,
+  # we'll have some yaml ala:
+  # ---
+  # :vqsr:
+  #   :training_sets:
+  #   - :name: hapmap
+  #     :type: VCF
+  #     :path: hapmap_3.3.b37.sites.vcf
+  #     :params: known=false,training=true,truth=true,prior=15.0
+  #   - :name: omni
+  #     :type: VCF
+  #     :path: 1000G_omni2.5.b37.sites.vcf
+  #     :params: known=false,training=true,truth=false,prior=12.0
+  #   :annotations:
+  #   - HaplotypeScore
+  #   - MQRankSum
+  #   - ReadPosRankSum
+  #   - FS
+  #   - MQ
+  def do_vqsr?(data)
+    return false #This is currently disabled for individuals
+    vqsr_data = data.first[:vqsr] || @default_config[:vqsr]
+    if vqsr_data
+      if vqsr_data[:training_sets] && vqsr_data[:training_sets].size > 0 &&
+        vqsr_data[:annotations] && vqsr_data[:annotations].size >0
+        return true
+      end
+    end
+    return false
+  end
+
+  # What strand call confidence for UnifiedGenotyper
+  # Will depend on if we are doing vqsr
+  def unified_genotyper_strand_call_conf(data)
+    if do_vqsr?(data)
+      "20.0"
+    else
+      "30.0"
+    end
   end
 
   def script_template()
@@ -326,7 +463,7 @@ class AnalysisTemplaterApp
   REVISION_DATE = "2011-05-16"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2011 Oklahoma Medical Research Foundation"
-  
+
   # Set up the app to roun
   # *+args+ - command line ARGS formatted type array
   # *+ios+ - optional hash to set stdin, stdout, & stderr
@@ -334,11 +471,11 @@ class AnalysisTemplaterApp
     @stdin = ios[:stdin] || STDIN
     @stdout = ios[:stdout] || STDOUT
     @stderr = ios[:stderr] || STDERR
-    
+
     @args = args
     set_default_options()
   end #initialize(args,ios)
-  
+
   # Do the work
   def run
     if !options_parsed?() || !options_valid?()
@@ -350,24 +487,28 @@ class AnalysisTemplaterApp
   end #run
 
   private
-  
+
   # Do the work of running this app
   def run_real
     @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil}]).first
-    
+
     statii = @options.samples.map do |sample_name|
       process_sample(sample_name)
     end
     return statii.max
   end #run
-  
+
   # Make the dir, the analyze script and launch said script for sample_name
   def process_sample(sample_name)
     data = @config[sample_name]
+    if @options.debug
+      puts AnalysisTemplate.new(@default_config,sample_name,data)
+      return 0
+    end
     output_dir = File.join(@options.output_base,sample_name)
 
     unless Dir.mkdir(output_dir)
-      @stderr.puts "Failed to make dir: #{output_dir} for #{sample_name}" 
+      @stderr.puts "Failed to make dir: #{output_dir} for #{sample_name}"
       return 1
     end
 
@@ -378,7 +519,7 @@ class AnalysisTemplaterApp
 
     return_dir = Dir.pwd
     unless Dir.chdir(output_dir)
-      @stderr.puts "Failed to change to dir: #{output_dir} for #{sample_name}" 
+      @stderr.puts "Failed to change to dir: #{output_dir} for #{sample_name}"
       return 1
     end
 
@@ -401,6 +542,7 @@ class AnalysisTemplaterApp
       o.on('-v','--version') { output_version($stdout); exit(0) }
       o.on('-h','--help') { output_help($stdout); exit(0) }
       o.on('-V', '--verbose')    { @options.verbose = true }
+      o.on('-D', '--debug')    { @options.debug = true }
 
       o.on("-d","--delay", "=REQUIRED") do |amount|
         @options.delay = amount.to_i
@@ -419,7 +561,7 @@ class AnalysisTemplaterApp
     @options.samples = @args
     return true
   end #options_parsed?
-  
+
   # Open/parase/load the YAML config file
   def loaded_config?
     begin
@@ -430,7 +572,7 @@ class AnalysisTemplaterApp
     end
     return true
   end #loaded_config?
-  
+
   # Test that the given output base dir exists & is writeabale
   def output_base_valid?
     if File.exists?(@options.output_base)
@@ -446,7 +588,7 @@ class AnalysisTemplaterApp
     end
     return true
   end #output_base_valid?
-  
+
   # Did the user provide us with additional args to use as sample ids
   def have_sample_ids?
     if @options.samples && @options.samples.size > 0
@@ -455,7 +597,7 @@ class AnalysisTemplaterApp
     @stderr.puts "Missing sample id(s) to processor"
     return false
   end #have_sample_ids?
-  
+
   # Are all the ids they gave in the config file actually
   def sample_ids_in_config?
     # check them all first
@@ -467,7 +609,7 @@ class AnalysisTemplaterApp
     end
     return true
   end #sample_ids_in_config?
-  
+
   # Makes sure the options we have make sense
   def options_valid?
     loaded_config? &&
@@ -475,7 +617,7 @@ class AnalysisTemplaterApp
     have_sample_ids? &&
     sample_ids_in_config?
   end #options_valid?
-  
+
   # Set our default options
   def set_default_options()
     @options = OpenStruct.new(
@@ -486,7 +628,7 @@ class AnalysisTemplaterApp
       :delay => 30
     )
   end #set_default_options()
-  
+
   # Just print the usage message
   def output_usage(out)
     out.puts <<-EOF
@@ -511,7 +653,7 @@ class AnalysisTemplaterApp
     out.puts ""
     output_usage(out)
   end
-  
+
 end
 
 if $0 == __FILE__
@@ -529,7 +671,7 @@ module load samtools/0.1.12
 module unload picard
 module load picard/1.36
 module unload gatk
-module load gatk/1.0.5777
+module load gatk/1.1
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
@@ -572,7 +714,7 @@ if [ "$?" -ne "0" ]; then
   exit 1
 fi
 
-# Prep all those reads for alignment with bwa aln 
+# Prep all those reads for alignment with bwa aln
 mkdir 01_bwa_aln_sai
 qsub -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_sam_inputs() %>
 
@@ -649,10 +791,10 @@ fi
 
 qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
 
-if [ "$?" -ne "0" ]; then                                                                                                                                                                                            
- echo -e "Failure indexing duplicate marked bam"                                                                                                                                                                       
- exit 1                                                                                                                                                                                                              
-fi 
+if [ "$?" -ne "0" ]; then
+ echo -e "Failure indexing duplicate marked bam"
+ exit 1
+fi
 
 # Calculate intervals for realignment
 mkdir 06_intervals
@@ -693,12 +835,14 @@ mkdir qc
 qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
 
 # Finally call individuals indels & snps
-qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_variants gatk -et NO_ET -T UnifiedGenotyper -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_variants.vcf -stand_call_conf 30.0 -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
+qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_variants gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(@data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
 
 if [ "$?" -ne "0" ]; then
  echo -e Failure
  exit 1
 fi
+
+<%= variant_quality_score_recalibration(@sample_name,@data) if do_vqsr?(@data) %>
 
 bgzip <%= @sample_name %>_variants.vcf
 tabix <%= @sample_name %>_variants.vcf.gz

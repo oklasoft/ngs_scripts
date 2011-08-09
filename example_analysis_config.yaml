@@ -1,0 +1,41 @@
+--- 
+DEFAULT: 
+- :bwa_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa
+  :gatk_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta
+  :snp_rod: /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod
+  :vqsr: 
+    :variant_recalibrator_opts:
+      :maxGaussians: 4
+    :training_sets: 
+    - :name: hapmap
+      :type: VCF
+      :path: /Volumes/hts_core/Shared/gatk_resources/b37/hapmap_3.3.b37.sites.vcf
+      :params: "known=false,training=true,truth=true,prior=15.0"
+    - :name: omni
+      :type: VCF
+      :path: /Volumes/hts_core/Shared/gatk_resources/b37/1000G_omni2.5.b37.sites.vcf
+      :params: "known=false,training=true,truth=false,prior=12.0"
+    - :name: dbsnp
+      :type: VCF
+      :path: /Volumes/hts_core/Shared/gatk_resources/b37/dbsnp_132.b37.vcf
+      :params: "known=true,training=false,truth=false,prior=8.0"
+    :annotations: 
+    - HaplotypeScore
+    - MQRankSum
+    - ReadPosRankSum
+    - FS
+    - MQ
+    - QD
+test: 
+- :run: "001"
+  :inputs: 
+  - /somepath/s_1_1_sequence.txt.gz
+  - /somepath/s_1_2_sequence.txt.gz
+  :is_paired: true
+  :lane: "1"
+- :run: "002"
+  :inputs: 
+  - /somotherpath/s_2_1_sequence.txt.gz
+  - /somotherpath/s_2_2_sequence.txt.gz
+  :is_paired: true
+  :lane: "2"
