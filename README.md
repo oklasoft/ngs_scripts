@@ -81,6 +81,10 @@ a high priority for me.
 
   Deprecated script again having to do something with CLC
   
+* **vqsr_vcf.rb**
+
+  Performs the GATK Variant Quality Score Recalibration workflow on a VCF
+  
 * **add_read_group_to_sam.pl**
 
   PERL script found online at [seqanswers.com](http://seqanswers.com/forums/showthread.php?t=4180) to force the RG tag, as version of BWA currently used does not add it for unaligned reads
