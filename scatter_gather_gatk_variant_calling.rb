@@ -213,7 +213,7 @@ Dir.chdir(@options.output_base) do
 
       cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
--A FS -A AlleleBalance \
+-A AlleleBalance \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
 -o #{output_file} \
