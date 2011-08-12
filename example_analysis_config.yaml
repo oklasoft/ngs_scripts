@@ -3,6 +3,9 @@ DEFAULT:
 - :bwa_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa
   :gatk_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta
   :snp_rod: /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod
+  :opts:
+    :skip_btangs: false
+    :skip_vcf: false
   :vqsr: 
     :variant_recalibrator_opts:
       :maxGaussians: 4

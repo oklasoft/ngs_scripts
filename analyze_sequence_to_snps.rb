@@ -97,7 +97,11 @@ class AnalysisTemplate
         pair_part = sequence[:is_paired] ? i_i+1 : 0
         shell_var = "FASTQ#{fastqs.size+1}"
         base_file = "#{cleaned_prefix}_#{pair_part}".downcase
-        path = "`pwd`\"/#{prefix}/#{base_file}.fastq\""
+        path = if @default_config[:opts][:skip_btangs]
+          input
+        else
+          "`pwd`\"/#{prefix}/#{base_file}.fastq\""
+        end
         fastqs << "#{shell_var}=#{path}"
         @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
         @fastq_shell_vars_by_lane[-1] << shell_var
@@ -218,6 +222,7 @@ class AnalysisTemplate
   end
 
   def clean_commands(sample_name,data)
+    return if @default_config[:opts][:skip_btangs]
     #clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
     cleans = []
     data.each_with_index do |sequence,s_i|
@@ -228,7 +233,12 @@ class AnalysisTemplate
       cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
       cleans << "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
     end
-    cleans.join("\n")
+    cleans.join("\n") + <<-EOF
+    if [ "$?" -ne "0" ]; then
+      echo -e "Failure with btang cleaning"
+      exit 1
+    fi 
+EOF
   end
 
   # output a -D SNP rod file, if we have a snp_rod
@@ -246,6 +256,31 @@ class AnalysisTemplate
     end
   end
 
+  
+
+  def variant_call(sample_name,data)
+    if @default_config[:opts][:skip_vcf]
+      return ""
+    else
+      ERB.new(<<-EOF
+      # Finally call individuals indels & snps
+
+      qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variants gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+
+      if [ "$?" -ne "0" ]; then
+       echo -e Failure
+       exit 1
+      fi
+
+      <%= variant_quality_score_recalibration(sample_name,@data) if do_vqsr?(data) %>
+
+      bgzip <%= sample_name %>_variants.vcf
+      tabix <%= sample_name %>_variants.vcf.gz
+      EOF
+      ).result(binding)
+    end
+  end
+  
   def covariate_or_final(sample_name,data)
     if data.first[:snp_rod] || @default_config[:snp_rod]
       covariate_recalibration(sample_name,data)
@@ -490,7 +525,7 @@ class AnalysisTemplaterApp
 
   # Do the work of running this app
   def run_real
-    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil}]).first
+    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false,:skip_vcf => false}}]).first
 
     statii = @options.samples.map do |sample_name|
       process_sample(sample_name)
@@ -696,11 +731,6 @@ SAMPLE="<%= @sample_name %>"
   clean_commands(@sample_name,@data)
 %>
 
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure with btang cleaning"
-  exit 1
-fi
-
 # TODO samtools flagstat logged on each bam?
 
 # setup input sams, will get illumina scores to standard sanger
@@ -834,18 +864,7 @@ fi
 mkdir qc
 qsub -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
 
-# Finally call individuals indels & snps
-qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_variants gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= @sample_name %>.bam -o <%= @sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(@data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(@data) %>
-
-if [ "$?" -ne "0" ]; then
- echo -e Failure
- exit 1
-fi
-
-<%= variant_quality_score_recalibration(@sample_name,@data) if do_vqsr?(@data) %>
-
-bgzip <%= @sample_name %>_variants.vcf
-tabix <%= @sample_name %>_variants.vcf.gz
+<%= variant_call(@sample_name,@data) %>
 
 # Clean up after ourselves
 rm -rf 00_inputs \
