@@ -201,7 +201,14 @@ Dir.chdir(@options.output_base) do
       input_file = File.join(Dir.pwd,sliced_interval_file)
       
       snp_opt = if @options.snp_path then
-        "-B:dbsnp,vcf #{@options.snp_path}"
+        case @options.snp_path 
+          when /\.rod$/
+            "-D #{@options.snp_path}"
+          when /\.vcf(\.gz)?$/
+            "-B:dbsnp,vcf #{@options.snp_path} "
+          else
+            ""
+          end
       else
         ""
       end
@@ -209,7 +216,7 @@ Dir.chdir(@options.output_base) do
       cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
 -A FS -A AlleleBalance \
--R #{@options.reference_path} #{snp_opt}\
+-R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
 -o #{output_file} \
 -stand_call_conf #{@options.stand_call_conf} -stand_emit_conf 10.0 \
