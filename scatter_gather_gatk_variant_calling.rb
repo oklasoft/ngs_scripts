@@ -200,17 +200,15 @@ Dir.chdir(@options.output_base) do
       output_file = File.join(Dir.pwd,"#{name_base}_#{slice}_variants.vcf")
       input_file = File.join(Dir.pwd,sliced_interval_file)
       
-      snp_opt = if @options.snp_path then
-        case @options.snp_path 
-          when /\.rod$/
-            "-D #{@options.snp_path}"
-          when /\.vcf(\.gz)?$/
-            "-B:dbsnp,vcf #{@options.snp_path} "
-          else
-            ""
-          end
-      else
-        ""
+      snp_opt = case @options.snp_path 
+        when nil
+          ""
+        when /\.rod$/
+          "-D #{@options.snp_path}"
+        when /\.vcf(\.gz)?$/
+          "-B:dbsnp,vcf #{@options.snp_path} "
+        else
+          ""
       end
 
       cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} \
