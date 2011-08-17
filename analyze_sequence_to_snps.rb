@@ -234,10 +234,12 @@ class AnalysisTemplate
       cleans << "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
     end
     cleans.join("\n") + <<-EOF
+
     if [ "$?" -ne "0" ]; then
       echo -e "Failure with btang cleaning"
       exit 1
     fi 
+
 EOF
   end
 
