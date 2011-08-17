@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9 -w -Ku
+#!/usr/bin/env ruby1.9
 #
 # split_vcf_by_loci.rb
 # Created by Stuart Glenn on 2011-06-13T13:39:57-0500 

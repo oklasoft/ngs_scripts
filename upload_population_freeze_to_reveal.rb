@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9 -w -Ku
+#!/usr/bin/env ruby1.9
 # encoding: UTF-8
 #
 # upload_population_freeze_to_reveal.rb

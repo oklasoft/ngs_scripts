@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9 -w -Ku
+#!/usr/bin/env ruby1.9
 #
 # phase_vcf_with_beagle.rb
 # Created by Stuart Glenn on 2011-06-10T09:18:14-0500  

@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9 -w -Ku
+#!/usr/bin/env ruby1.9
 #
 # apply_default_variant_filtration.rb
 # Created by Stuart Glenn on 2011-06-09T15:39:34-0500 
