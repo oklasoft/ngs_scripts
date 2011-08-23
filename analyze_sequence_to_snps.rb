@@ -348,7 +348,7 @@ EOF
 
     mkdir 13_final_bam
     # resort & index that bam
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
     qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
@@ -879,12 +879,14 @@ rm -rf 00_inputs \
 07_realigned_bam \
 08_uncalibated_covariates \
 10_recalibrated_bam \
-11_calibated_covariates \
-qc/*.zip
+11_calibated_covariates
+
 
 # gzip & clean up some of the cleaned input as we keep some it for now, but don't need it fullsized
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
+
+rm -f qc/*.zip
 
 touch finished.txt
