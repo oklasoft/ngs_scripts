@@ -211,7 +211,7 @@ Dir.chdir(@options.output_base) do
           ""
       end
 
-      cmd = "qsub -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} -l mem_free=5G \
+      cmd = "qsub -p -10 -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} -l mem_free=5G \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
 -A AlleleBalance \
 -R #{@options.reference_path} #{snp_opt} \
