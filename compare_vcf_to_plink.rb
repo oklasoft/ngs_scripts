@@ -108,7 +108,7 @@ end
 
 def extract_subset_of_snp_from_plink()
   cmd = ["plink","--file",@options.base_name,"--extract",@options.snp_list_path,"--recode","--out",extracted_name]
-  run_command("extract SNPs",cmd)
+  run_command("extract SNPs",cmd,{'stdout' => nil,'stderr' => nil})
 end
 
 def merge_data_set_with_as(a,b,output)
@@ -123,12 +123,12 @@ def merge_data_set_with_as(a,b,output)
     "--out",
     output
   ]
-  run_command("plink merge",cmd)
+  run_command("plink merge",cmd,{'stdout' => nil,'stderr' => nil})
 end
 
 def flip_strand_for_in(snp_list,plink_set)
   cmd = ["plink","--file",plink_set,"--flip",snp_list,"--recode","--out",flipped_name()]
-  run_command("plink strand flip",cmd)
+  run_command("plink strand flip",cmd,{'stdout' => nil,'stderr' => nil})
 end
 
 def exclude_from_in(snp_list,plink_set)
@@ -139,7 +139,7 @@ def exclude_from_in(snp_list,plink_set)
     end
   end
   cmd = ["plink","--file",plink_set,"--exclude","bad_snps_to_extract.txt","--recode","--out",excluded_name()]
-  run_command("plink strand flip",cmd)
+  run_command("plink strand flip",cmd,{'stdout' => nil,'stderr' => nil})
 end
 
 def merge_data_sets_fixing_flips()
@@ -166,7 +166,7 @@ end
 
 def genome_compare()
   cmd = ["plink","--file","merge","--mind","0.99","--genome","--min","0.4","--out","#{@options.base_name}_comparison"]
-  run_command("plink compare",cmd,{'stdout' => nil})
+  run_command("plink compare",cmd,{'stdout' => nil,'stderr' => nil})
 end
 
 def report_results
@@ -185,6 +185,12 @@ def report_results
   return true
 end
 
+def cleanup
+  files = Dir.glob("*.*") - ["#{@options.base_name}_comparison.genome", 
+    "#{@options.base_name}_comparison.log","#{@options.base_name}_comparison.irem"]
+  FileUtils.rm(files,:force => true)
+end
+
 def run_comparison()
   get_copy_of_vcf() || fail("Could not get VCF copy")
   uncompress_vcf || fail("Could not uncompress VCF")
@@ -193,6 +199,7 @@ def run_comparison()
   merge_data_sets_fixing_flips() || fail("Could not merge")
   genome_compare || fail("Unable to compare")
   report_results
+  cleanup
 end
 
 def output_version(out)
