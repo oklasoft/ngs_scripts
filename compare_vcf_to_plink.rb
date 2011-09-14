@@ -81,6 +81,7 @@ end
 
 def get_copy_of_vcf()
   FileUtils.cp(@options.input_vcf_path,File.basename(@options.input_vcf_path))
+  File.readable?(File.basename(@options.input_vcf_path)) #why you no have return value cp
 end
 
 def uncompress_vcf()
