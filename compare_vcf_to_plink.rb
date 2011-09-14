@@ -131,7 +131,7 @@ def flip_strand_for_in(snp_list,plink_set)
   run_command("plink strand flip",cmd)
 end
 
-def exclude_any_remaining_problem_snps(snp_list,plink_set)
+def exclude_from_in(snp_list,plink_set)
   File.open("bad_snps_to_extract.txt","w") do |f|
     IO.foreach(snp_list) do |line|
       parts = line.chomp.split(/\t/)
@@ -146,7 +146,7 @@ def merge_data_sets_fixing_flips()
   unless merge_data_set_with_as(@options.plink_data_path,extracted_name(),"merge")
     # a failed first merge means some strand flipping is needed most likely
     if File.size?("merge.missnp")
-      flip_strand_vcf_set("merge.missnp",extracted_name()) || fail("Unable to flip strands")
+      flip_strand_for_in("merge.missnp",extracted_name()) || fail("Unable to flip strands")
       File.unlink("merge.missnp")
     else
       fail("First merge failed & there were no strands to flip")
@@ -154,7 +154,7 @@ def merge_data_sets_fixing_flips()
     unless merge_compare_set_to_vcf_set(@options.plink_data_path,flipped_name(),"merge")
       # second merge failure is likely due then to extra screw snps, exclude those suckers
       if File.size?("merge.missnp")
-        exclude_any_remaining_problem_snps("merge.missnp",flipped_name()) || fail("Unable to exclude problem SNPs")
+        exclude_from_in("merge.missnp",flipped_name()) || fail("Unable to exclude problem SNPs")
         merge_data_set_with_as(@optopns.plink_data_path,excluded_name(),"merge")
       else
         fail("Second merge failed & there were no SNPs to extract")
