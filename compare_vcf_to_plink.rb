@@ -45,14 +45,14 @@ require 'yaml'
 require 'open4'
 require 'fileutils'
 
-def run_command(name,cmd)
+def run_command(name,cmd,overrides={})
   opts = {
     'stdin' => nil, 
     'stdout' => $stdout, 
     'stderr' => $stderr, 
     'raise' => false, 
     'quiet' => true
-  }
+  }.merge(overrides)
   puts "Running: #{cmd.join(" ")}" if @options.verbose
   pre = Hash.new
   pre[:stdout] = $stdout.sync
@@ -164,13 +164,29 @@ def merge_data_sets_fixing_flips()
   return true
 end
 
+def genome_compare()
+  cmd = ["plink","--file","merge","--mind","0.99","--genome","--min","0.4","--out","#{@options.base_name}_comparison"]
+  run_command("plink compare",cmd,{:stdout => nil})
+end
+
+def report_results
+  IO.foreach("#{@options.base_name}_comparison.genome") do |line|
+    if line =~ /^\s+FID/
+      puts line.chomp
+    elsif line =~ /.*lgs.*/
+      puts line.chomp
+    end
+  end
+  return true
+end
+
 def run_comparison()
   get_copy_of_vcf() || fail("Could not get VCF copy")
   uncompress_vcf || fail("Could not uncompress VCF")
   convert_vcf_to_plink || fail("Could not convert VCF to plink")
   extract_subset_of_snp_from_plink || fail("Could not extract SNP subset")
   merge_data_sets_fixing_flips() || fail("Could not merge")
-  genome_compare
+  genome_compare || fail("Unable to compare")
   report_results
 end
 
