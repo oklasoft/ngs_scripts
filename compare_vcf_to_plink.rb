@@ -186,7 +186,7 @@ def report_results
 end
 
 def cleanup
-  files = Dir.glob("*.*") - ["#{@options.base_name}_comparison.genome", 
+  files = Dir.glob("*.*") - ["#{@options.base_name}_comparison.genome", "bad_snps_to_extract.txt",
     "#{@options.base_name}_comparison.log","#{@options.base_name}_comparison.irem"]
   FileUtils.rm(files,:force => true)
 end
