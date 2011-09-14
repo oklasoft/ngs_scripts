@@ -74,6 +74,50 @@ def run_command(name,cmd)
   # exit(status.exitstatus)
 end
 
+def fail(msg)
+  $stderr.puts msg
+  exit(1)
+end
+
+def get_copy_of_vcf()
+  FileUtils.cp(@options.input_vcf_path,File.basename(@options.input_vcf_path))
+end
+
+def uncompress_vcf()
+  cmd = ["gunzip",File.basename(@options.input_vcf_path)]
+  run_command("uncomress VCF",cmd)
+end
+
+def convert_vcf_to_plink()
+  cmd = ["vcftools","--plink","--vcf","#{@options.base_name}.vcf","--out",@options.base_name]
+  run_command("vcf to plink",cmd)
+end
+
+def extracted_name
+  "#{@options.base_name}_extracted"
+end
+
+def extract_subset_of_snp_from_plink()
+  cmd = ["plink","--file",@options.base_name,"--extract",@options.snp_list_path,"--recode","--out",extracted_name]
+  run_command("extract SNPs",cmd)
+end
+
+
+
+def run_comparison()
+  get_copy_of_vcf() || fail("Could not get VCF copy")
+  uncompress_vcf || fail("Could not uncompress VCF")
+  convert_vcf_to_plink || fail("Could not convert VCF to plink")
+  extract_subset_of_snp_from_plink || fail("Could not extract SNP subset")
+  merge_compare_set_to_vcf_set
+  flip_strand_vcf_set
+  merge_compare_set_to_vcf_set
+  exclude_any_remaining_problem_snps
+  merge_compare_set_to_vcf_set
+  genome_compare
+  report_results
+end
+
 def output_version(out)
   out.puts "#{File.basename($0)} 1.0"
 end
@@ -136,9 +180,24 @@ def parse_opts(args)
   end  
 end
 
-def has_plink?
+def input_files_readable?
+  {
+    @options.input_vcf_path  => "input VCF",
+    @options.snp_list_path  => "SNP list",
+    "#{@options.plink_data_path}.ped" => "plink ped file",
+    "#{@options.plink_data_path}.map" => "plink map file"
+  }.each do |file,msg|
+    unless File.readable?(file)
+      $stderr.puts "Sorry I can't read the #{msg}"
+      return false
+    end
+  end
+  return true
+end
+
+def has_cmd?(cmd)
   result = ""
-  status = Open4::open4("which","plink") do |pid, stdin, stdout, stderr|
+  status = Open4::open4("which",cmd) do |pid, stdin, stdout, stderr|
     stdin.close
     result = stdout.read.strip unless stdout.eof?
   end
@@ -151,28 +210,25 @@ end
 
 parse_opts(ARGV)
 
-unless has_plink?
-  $stderr.puts "Can't find plink"
+unless input_files_readable? 
+  $stderr.puts "Can't work without input"
   exit(1)
 end
 
-base_vcf_name = File.basename(File.basename(@options.input_vcf_path,".gz"),".vcf")
+%w/plink vcftools gunzip/.each do |cmd|
+  unless has_cmd?(cmd)
+    $stderr.puts "Can't find #{cmd}"
+    exit(1)
+  end
+end
+
+@options.base_name = File.basename(File.basename(@options.input_vcf_path,".gz"),".vcf")
 
 Dir.chdir(@options.output_base_dir) do
   puts "Comparison Starting #{$$}" if @options.verbose
   work_dir = "#{Time.now.strftime("%Y%m%d")}_compare_vcf_to_plink_work_dir.#{$$}"
   raise "Can't make work dir" unless Dir.mkdir(work_dir)
   Dir.chdir(work_dir) do
-    get_copy_of_vcf
-    uncompress_vcf
-    convert_vcf_to_plink
-    extract_subset_of_snp_from_plink
-    merge_compare_set_to_vcf_set
-    flip_strand_vcf_set
-    merge_compare_set_to_vcf_set
-    exclude_any_remaining_problem_snps
-    merge_compare_set_to_vcf_set
-    genome_compare
-    report_results
+    run_comparison()
   end
 end
