@@ -138,7 +138,7 @@ def exclude_from_in(snp_list,plink_set)
       f.puts parts[1]
     end
   end
-  cmd = ["plink","--file",plink_set,"--extract","bad_snps_to_extract.txt","--recode","--out",excluded_name()]
+  cmd = ["plink","--file",plink_set,"--exclude","bad_snps_to_extract.txt","--recode","--out",excluded_name()]
   run_command("plink strand flip",cmd)
 end
 
@@ -170,13 +170,18 @@ def genome_compare()
 end
 
 def report_results
+  data = []
   IO.foreach("#{@options.base_name}_comparison.genome") do |line|
     if line =~ /^\s+FID/
       puts line.chomp
     elsif line =~ /.*lgs.*/
-      puts line.chomp
+      data << line.chomp
     end
   end
+  data.sort! do |a,b|
+    a.split(/\s+/)[9].to_f <=> b.split(/\s+/)[9].to_f
+  end
+  puts data.join("\n")
   return true
 end
 
