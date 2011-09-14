@@ -183,7 +183,7 @@ def output_help(out)
   -v, --version             Print version info
   -h, --help                Print this help
   -V, --verbose             Enable verbosity
-  -D, --deub                Enable debuging
+  -D, --debug               Enable debuging
   -o, --output DIR          Save output in DIR
   -i, --input VCF           Input VCF to be VQSRed
   -c, --config YAML         A configuration YAML, has more specific flags for VQSR
