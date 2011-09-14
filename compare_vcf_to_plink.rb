@@ -155,7 +155,7 @@ def merge_data_sets_fixing_flips()
       # second merge failure is likely due then to extra screw snps, exclude those suckers
       if File.size?("merge.missnp")
         exclude_from_in("merge.missnp",flipped_name()) || fail("Unable to exclude problem SNPs")
-        return merge_data_set_with_as(@optopns.plink_data_path,excluded_name(),"merge")
+        return merge_data_set_with_as(@options.plink_data_path,excluded_name(),"merge")
       else
         fail("Second merge failed & there were no SNPs to extract")
       end
@@ -166,7 +166,7 @@ end
 
 def genome_compare()
   cmd = ["plink","--file","merge","--mind","0.99","--genome","--min","0.4","--out","#{@options.base_name}_comparison"]
-  run_command("plink compare",cmd,{:stdout => nil})
+  run_command("plink compare",cmd,{'stdout' => nil})
 end
 
 def report_results
