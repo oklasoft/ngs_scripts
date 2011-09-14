@@ -9,6 +9,7 @@ DEFAULT:
   :vqsr: 
     :variant_recalibrator_opts:
       :maxGaussians: 4
+      :percentBadVariants: 0.05
     :training_sets: 
     - :name: hapmap
       :type: VCF
@@ -29,6 +30,7 @@ DEFAULT:
     - FS
     - MQ
     - QD
+    - InbreedingCoeff
 test: 
 - :run: "001"
   :inputs: 
