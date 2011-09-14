@@ -98,23 +98,77 @@ def extracted_name
   "#{@options.base_name}_extracted"
 end
 
+def flipped_name
+  "#{@options.base_name}_extracted_flipped"
+end
+
+def excluded_name
+  "#{@options.base_name}_extracted_flipped_excluded"
+end
+
 def extract_subset_of_snp_from_plink()
   cmd = ["plink","--file",@options.base_name,"--extract",@options.snp_list_path,"--recode","--out",extracted_name]
   run_command("extract SNPs",cmd)
 end
 
+def merge_data_set_with_as(a,b,output)
+  cmd = [
+    "plink",
+    "--file",
+    a,
+    "--merge",
+    "#{b}.ped",
+    "#{b}.map",
+    "--recode",
+    "--out",
+    output
+  ]
+  run_command("plink merge",cmd)
+end
 
+def flip_strand_for_in(snp_list,plink_set)
+  cmd = ["plink","--file",plink_set,"--flip",snp_list,"--recode","--out",flipped_name()]
+  run_command("plink strand flip",cmd)
+end
+
+def exclude_any_remaining_problem_snps(snp_list,plink_set)
+  File.open("bad_snps_to_extract.txt","w") do |f|
+    IO.foreach(snp_list) do |line|
+      parts = line.chomp.split(/\t/)
+      f.puts parts[1]
+    end
+  end
+  cmd = ["plink","--file",plink_set,"--extract","bad_snps_to_extract.txt","--recode","--out",excluded_name()]
+  run_command("plink strand flip",cmd)
+end
+
+def merge_data_sets_fixing_flips()
+  unless merge_compare_set_to_vcf_set(@options.plink_data_path,extracted_name(),"merge")
+    # a failed first merge means some strand flipping is needed most likely
+    if File.size?("merge.missnp")
+      flip_strand_vcf_set("merge.missnp",extracted_name()) || fail("Unable to flip strands")
+      File.unlink("merge.missnp")
+    else
+      fail("First merge failed & there were no strands to flip")
+    end
+    unless merge_compare_set_to_vcf_set(@options.plink_data_path,flipped_name(),"merge")
+      # second merge failure is likely due then to extra screw snps, exclude those suckers
+      if File.size?("merge.missnp")
+        exclude_any_remaining_problem_snps("merge.missnp",flipped_name()) || fail("Unable to exclude problem SNPs")
+        merge_compare_set_to_vcf_set(@optopns.plink_data_path,excluded_name(),"merge")
+      else
+        fail("Second merge failed & there were no SNPs to extract")
+      end
+    end
+  end
+end
 
 def run_comparison()
   get_copy_of_vcf() || fail("Could not get VCF copy")
   uncompress_vcf || fail("Could not uncompress VCF")
   convert_vcf_to_plink || fail("Could not convert VCF to plink")
   extract_subset_of_snp_from_plink || fail("Could not extract SNP subset")
-  merge_compare_set_to_vcf_set
-  flip_strand_vcf_set
-  merge_compare_set_to_vcf_set
-  exclude_any_remaining_problem_snps
-  merge_compare_set_to_vcf_set
+  merge_data_sets_fixing_flips() || fail("Could not merge")
   genome_compare
   report_results
 end
