@@ -179,7 +179,7 @@ def report_results
     end
   end
   data.sort! do |a,b|
-    a.split(/\s+/)[9].to_f <=> b.split(/\s+/)[9].to_f
+    b.split(/\s+/)[9].to_f <=> a.split(/\s+/)[9].to_f
   end
   puts data.join("\n")
   return true
