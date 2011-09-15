@@ -310,7 +310,7 @@ end
 
 Dir.chdir(@options.output_base_dir) do
   puts "Comparison Starting #{$$}" if @options.verbose
-  work_dir = "#{Time.now.strftime("%Y%m%d")}_compare_vcf_to_plink_work_dir.#{$$}"
+  work_dir = "#{Time.now.strftime("%Y%m%d")}_#{@options.base_name}_compare_vcf_to_plink_work_dir.#{$$}"
   raise "Can't make work dir" unless Dir.mkdir(work_dir)
   Dir.chdir(work_dir) do
     run_comparison()
