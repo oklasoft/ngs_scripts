@@ -54,9 +54,9 @@ def subset_vcf_to_vcf_around(input_vcf,output_vcf,chr,start,stop)
   --from-bp #{start} \\
   --to-bp #{stop} \\
   --remove-filtered GATKStandard \\
+  --remove-filtered GATKStandardIndel \\
   --remove-filtered HARD_TO_VALIDATE \\
   --remove-filtered LowQual \\
-  --remove-filtered SnpCluster \\
   --keep-INFO-all \\
   --recode
 EOF
