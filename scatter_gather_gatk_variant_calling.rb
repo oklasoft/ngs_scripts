@@ -211,7 +211,7 @@ Dir.chdir(@options.output_base) do
           ""
       end
 
-      cmd = "qsub -p -10 -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} -l mem_free=5G \
+      cmd = "qsub -p -10 -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} -l mem_free=5G,virtual_free=5G \
 gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
 -A AlleleBalance \
 -R #{@options.reference_path} #{snp_opt} \
@@ -228,7 +228,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
   end #work_dir
 
   cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
-gatk -et NO_ET -T CombineVariants \\
+-l mem_free=5G,virtual_free=5G gatk -et NO_ET -T CombineVariants \\
 -genotypeMergeOptions UNSORTED \\
 -R #{@options.reference_path} \\
 -o #{name_base}_variants.vcf \\
