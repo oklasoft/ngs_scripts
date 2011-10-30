@@ -267,7 +267,7 @@ EOF
       ERB.new(<<-EOF
       # Finally call individuals indels & snps
 
-      qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variants gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+      qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variants -l mem_free=5G gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
 
       if [ "$?" -ne "0" ]; then
        echo -e Failure
@@ -305,7 +305,7 @@ EOF
 
     mkdir 08_uncalibated_covariates
     # recalibration
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates -l mem_free=5G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -313,10 +313,10 @@ EOF
     fi
 
     mkdir 09_original_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates -l mem_free=4G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
 
     mkdir 10_recalibrated_bam
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %>
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate -l mem_free=5G gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %>
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
@@ -336,7 +336,7 @@ EOF
 
 
     mkdir 11_calibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates -l mem_free=5G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting calibrated covariates"
@@ -344,7 +344,7 @@ EOF
     fi
 
     mkdir 12_recalibrated_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
 
     mkdir 13_final_bam
     # resort & index that bam
@@ -376,7 +376,7 @@ EOF
     mkdir 14_vqsr
 
     # filters we will use later
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variant_filtration \\
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variant_filtration -l mem_free=5G \\
     gatk -et NO_ET -T VariantFiltration \\
     -R ${GATK_REF} \\
     -o 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf  \\
@@ -390,7 +390,7 @@ EOF
     fi
 
     # call VariantRecalibrator
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_recalibrate gatk \\
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_recalibrate -l mem_free=5G gatk \\
     -T VariantRecalibrator -et NO_ET \\
     -R ${GATK_REF} <%= vqsr_training_data_gatk_opts(vqsr_data) %> \\
     -B:input,VCF 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf \\
@@ -418,7 +418,7 @@ EOF
     rm -f <%= sample_name %>_variants.vcf*
 
     # call ApplyRecalibration
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_apply \\
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_apply -l mem_free=5G \\
     gatk -T ApplyRecalibration -R ${GATK_REF} \\
     -B:input,VCF 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf \\
     --ts_filter_level 99.0 \\
@@ -830,7 +830,7 @@ fi
 
 # Calculate intervals for realignment
 mkdir 06_intervals
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_intervals gatk -et NO_ET -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_intervals -l mem_free=5G gatk -et NO_ET -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure with target realigment creation"
@@ -839,7 +839,7 @@ fi
 
 # Now realign & fix any mate info
 mkdir 07_realigned_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign -l mem_free=5G gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure with indel realigmnent"
