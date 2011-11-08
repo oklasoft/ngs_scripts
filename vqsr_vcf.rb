@@ -111,7 +111,6 @@ def variant_recalibrator(data,input_vcf,base_vcf_name)
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
   cmd += ["-rscriptFile", vqsr_output_file(base_vcf_name,"R")]
   cmd += ["-resources", File.join(@gatk_base,"resources")]
-  cmd += %w/--ignore_filter LowQual --ignore_filter HARD_TO_VALIDATE/
   run_command("VariantRecalibrator",cmd)
 end
 
