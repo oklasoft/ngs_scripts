@@ -107,13 +107,14 @@ def output_help(out)
   -h, --help                Print this help
   -V, --verbose             Enable verbosity
   -D, --deub                Enable debuging
-  -o, --otput DIR           Save output in DIR
+  -o, --output DIR           Save output in DIR
   -i, --interval LIST_FILE  File of intervals
   -b, --bam_list BAM_LIST   File listing the BAMs
   -r, --reference FASTQ     Fasta/q reference file against the BAMs were aligned
   -d, --dbsnp DBSNP         A VCF of SNP info for the UnifiedGenotyper
   -s, --scatter NUM         Scattering into NUM sub instances, defaults to 100
   --stand_call_conf VAL     Set stand_call_conf for GATK, defaults to 30.0
+  --stand_emit_conf VAL     Set stand_emit_conf for GATK, defaults to 10.0
 EOF
 end
 
@@ -122,6 +123,7 @@ def parse_opts(args)
     :output_base => Dir.pwd,
     :scatter_limit => 100,
     :stand_call_conf => 30.0,
+    :stand_emit_conf => 10.0,
     :verbose => false,
     :debug => false,
     :bam_list => nil,
@@ -146,6 +148,10 @@ def parse_opts(args)
 
     o.on("--stand_call_conf", "=REQUIRED") do |conf|
       @options.stand_call_conf = conf.to_f
+    end
+
+    o.on("--stand_emit_conf", "=REQUIRED") do |conf|
+      @options.stand_emit_conf = conf.to_f
     end
 
     o.on("-b","--bam_list", "=REQUIRED") do |bam|
@@ -217,7 +223,8 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
 -o #{output_file} \
--stand_call_conf #{@options.stand_call_conf} -stand_emit_conf 10.0 \
+-stand_call_conf #{@options.stand_call_conf} \
+-stand_emit_conf #{@options.stand_emit_conf} \
 -L #{input_file}"
       puts cmd
       system cmd
