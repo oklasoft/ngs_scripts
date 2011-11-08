@@ -228,7 +228,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
 -L #{input_file}"
       puts cmd
       system cmd
-      sleep(5)
+      sleep(3)
 
       to_joins << "-B:#{File.basename(input_file)},VCF #{output_file}"
     end #each slice
