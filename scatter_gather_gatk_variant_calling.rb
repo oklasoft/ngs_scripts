@@ -106,8 +106,8 @@ def output_help(out)
   -v, --version             Print version info
   -h, --help                Print this help
   -V, --verbose             Enable verbosity
-  -D, --deub                Enable debuging
-  -o, --output DIR           Save output in DIR
+  -D, --debug               Enable debuging
+  -o, --output DIR          Save output in DIR
   -i, --interval LIST_FILE  File of intervals
   -b, --bam_list BAM_LIST   File listing the BAMs
   -r, --reference FASTQ     Fasta/q reference file against the BAMs were aligned
