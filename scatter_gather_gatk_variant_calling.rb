@@ -89,7 +89,7 @@ def normalize_interval_sizes(intervals,max_size)
 end
 
 def sliced_intervals()
-  intervals = normalize_interval_sizes(Interval.intervals_from_file(@options.interval_list),5000)
+  intervals = normalize_interval_sizes(Interval.intervals_from_file(@options.interval_list),@options.normalization_size)
 
   intervals_per_scatter = (intervals.size/@options.scatter_limit.to_f).ceil.to_i
   intervals.each_slice(intervals_per_scatter)
@@ -115,6 +115,8 @@ def output_help(out)
   -s, --scatter NUM         Scattering into NUM sub instances, defaults to 100
   --stand_call_conf VAL     Set stand_call_conf for GATK, defaults to 30.0
   --stand_emit_conf VAL     Set stand_emit_conf for GATK, defaults to 10.0
+  -t, --threads NUM         Run the GATK with NUM threads, defaults to 1
+  -n, --normalized NUM      Try to normalize the size intervals by be NUM size or less, defaults to 5000
 EOF
 end
 
@@ -129,7 +131,9 @@ def parse_opts(args)
     :bam_list => nil,
     :interval_list => nil,
     :reference_path => nil,
-    :snp_path => nil
+    :snp_path => nil,
+    :normalization_size => 5000,
+    :threads => 1
   )
   
   opts = OptionParser.new() do |o|
@@ -144,6 +148,14 @@ def parse_opts(args)
 
     o.on("-s","--scatter", "=REQUIRED") do |scatter|
       @options.scatter_limit = scatter.to_i
+    end
+
+    o.on("-n","--normalized", "=REQUIRED") do |normalization_size|
+      @options.normalization_size = normalization_size.to_i
+    end
+
+    o.on("-t","--threads", "=REQUIRED") do |threads|
+      @options.threads = threads.to_i
     end
 
     o.on("--stand_call_conf", "=REQUIRED") do |conf|
