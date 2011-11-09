@@ -205,6 +205,13 @@ Dir.chdir(@options.output_base) do
   to_joins = []
   Dir.chdir(work_dir) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
+    
+    threaded_queue = if @options.threads > 1
+      "-pe threaded #{@options.threads}"
+    else
+      ""
+    end
+    
     sliced_intervals().each_with_index do |sliced_intervals,slice|
       slice = slice.to_s.rjust(@options.scatter_limit.to_s.length,"0")
 
@@ -229,8 +236,9 @@ Dir.chdir(@options.output_base) do
           ""
       end
 
-      cmd = "qsub -p -10 -m e -o logs -b y -V -j y -cwd -q all.q -N #{name_base}_variants_#{slice} -l mem_free=5G,virtual_free=5G \
-gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt 1 \
+      cmd = "qsub #{threaded_queue} -p -10 -m e -o logs -b y -V -j y -cwd \
+      -N #{name_base}_variants_#{slice} -l mem_free=5G,virtual_free=5G \
+gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
 -A AlleleBalance \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
