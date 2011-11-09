@@ -253,20 +253,63 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
       to_joins << "-B:#{File.basename(input_file)},VCF #{output_file}"
     end #each slice
   end #work_dir
-
-  cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
--l mem_free=5G,virtual_free=5G gatk -et NO_ET -T CombineVariants \\
--genotypeMergeOptions UNSORTED \\
--R #{@options.reference_path} \\
--o #{name_base}_variants.vcf \\
+  
+  slices_of_to_joins = to_joins.each_slice(100000/to_joins.first.length).to_a
+  if 1 == slices_of_to_joins.size
+    cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
+  -l mem_free=5G,virtual_free=5G gatk -et NO_ET -T CombineVariants \\
+  -genotypeMergeOptions UNSORTED \\
+  -R #{@options.reference_path} \\
+  -o #{name_base}_variants.vcf"
+    cmd += " \\
 #{to_joins.join(" \\\n")}
-"
-  File.open("#{work_dir}-joiner.sh","w") do |f|
-    f.puts "#!/usr/bin/env bash"
-    f.puts "source /etc/profile.d/*.sh"
-    f.puts "module load sge"
-    f.puts "module load gatk/1.1"
-    f.puts cmd
+  "
+    File.open("#{work_dir}-joiner.sh","w") do |f|
+      f.puts "#!/usr/bin/env bash"
+      f.puts "source /etc/profile.d/*.sh"
+      f.puts "module load sge"
+      f.puts "module load gatk/1.1"
+      f.puts cmd
+    end
+  else
+    alphabet = ("aa".."zz").to_a
+    intermediate_vcfs_to_merge = []
+    slices_of_to_joins.each_with_index do |slice_of_to_joins,index|
+      cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
+      -l mem_free=5G,virtual_free=5G gatk -et NO_ET -T CombineVariants \\
+      -genotypeMergeOptions UNSORTED \\
+      -R #{@options.reference_path} \\
+      -o #{alphabet[index]}_#{name_base}_variants.vcf"
+      cmd += " \\
+#{slice_of_to_joins.join(" \\\n")}
+      "
+      intermediate_vcf = File.join(Dir.pwd,"#{alphabet[index]}_#{name_base}_variants.vcf")
+      intermediate_vcfs_to_merge << "-B:#{alphabet[index]}_#{name_base},VCF #{intermediate_vcf}"
+      File.open("#{work_dir}-#{alphabet[index]}-joiner.sh","w") do |f|
+        f.puts "#!/usr/bin/env bash"
+        f.puts "source /etc/profile.d/*.sh"
+        f.puts "module load sge"
+        f.puts "module load gatk/1.1"
+        f.puts cmd
+      end      
+    end
+    
+    cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N final_#{name_base}_variants_merge \\
+    -l mem_free=5G,virtual_free=5G gatk -et NO_ET -T CombineVariants \\
+    -genotypeMergeOptions UNSORTED \\
+    -R #{@options.reference_path} \\
+    -o #{name_base}_variants.vcf"
+    cmd += " \\
+#{intermediate_vcfs_to_merge.join(" \\\n")}
+    "
+    File.open("#{work_dir}-final-joiner.sh","w") do |f|
+      f.puts "#!/usr/bin/env bash"
+      f.puts "source /etc/profile.d/*.sh"
+      f.puts "module load sge"
+      f.puts "module load gatk/1.1"
+      f.puts cmd
+    end      
+    
+    
   end
-
 end #base_dir
