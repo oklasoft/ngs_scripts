@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env ruby1.9
 #
 # scatter_gather_gatk_variant_calling.rb
 # Created by Stuart Glenn on 2011-06-07
