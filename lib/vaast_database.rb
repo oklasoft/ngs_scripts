@@ -86,8 +86,8 @@ module OMRF
     
     def find(chr,coordinate)
       chrom_data = @vaast_data[chr]
-      return nil unless chrom_data
-      chrom_data[coordinate]
+      return {} unless chrom_data
+      return chrom_data[coordinate] || {}
     end
     
     private
