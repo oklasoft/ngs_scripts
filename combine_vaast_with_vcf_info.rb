@@ -53,11 +53,13 @@ end
 
 vaast = OMRF::VaastDatabaseOuputFiles.new(vaast_files)
 
+type_priorities = [:tu, :tr, :br]
+
 IO.foreach(vcf_info_file) do |line|
   if 1 == $.
     print "#{line.chomp}\tnm_id\tgene_name\tscore\trank\tgenome_permutation_p"
     print "\tgenome_permutation_0.95_lower\tgenome_permutation_0.95_upper"
-    puts "\ttr_score\ttr_change\ttu_score\ttu_change\tbr_change"
+    puts "\ttype\tscore\tchange"
   else
     parts = line.chomp.split(/\t/)
     chrom = parts[0]
@@ -66,11 +68,17 @@ IO.foreach(vcf_info_file) do |line|
     parts += [features[:id],features[:gene_name],features[:score],features[:rank],
       features[:genome_permutation_p],features[:genome_permutation_95_lower],
       features[:genome_permutation_95_upper]]
+
     types = features[:types] || {}
-    tr = types[:tr] || {}
-    tu = types[:tu] || {}
-    br = types[:br] || {}
-    parts += [tr[:score],tr[:change],tu[:score],tu[:change],br[:change]]
+    type_name = nil
+    type_priorities.each do |t|
+      if types[t]
+        type_name = t
+        break
+      end
+    end
+    type = types[type_name] || {}
+    parts += [type_name, type[:score], type[:change]]
     puts parts.join("\t")
   end
 end
