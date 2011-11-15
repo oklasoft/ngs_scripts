@@ -38,6 +38,7 @@
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+$:.unshift(File.join(File.dirname(__FILE__),"..","lib"))
 require "vaast_database"
 
 vcf_info_file = ARGV.shift
