@@ -57,9 +57,9 @@ type_priorities = [:tu, :tr, :br]
 
 IO.foreach(vcf_info_file) do |line|
   if 1 == $.
-    print "#{line.chomp}\tnm_id\tgene_name\tscore\trank\tgenome_permutation_p"
-    print "\tgenome_permutation_0.95_lower\tgenome_permutation_0.95_upper"
-    puts "\ttype\tscore\tchange"
+    print "#{line.chomp}\tvaast_nm_id\tvaast_gene_name\tvaast_score\tvaast_rank\tvaast_genome_permutation_p"
+    print "\tvaast_genome_permutation_0.95_lower\tvaast_genome_permutation_0.95_upper"
+    puts "\tvaast_type\tvaast_score\tvaast_change"
   else
     parts = line.chomp.split(/\t/)
     chrom = parts[0]
