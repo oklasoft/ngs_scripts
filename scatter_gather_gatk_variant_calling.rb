@@ -231,7 +231,7 @@ Dir.chdir(@options.output_base) do
         when /\.rod$/
           "-D #{@options.snp_path}"
         when /\.vcf(\.gz)?$/
-          "-B:dbsnp,vcf #{@options.snp_path} "
+          "-D #{@options.snp_path} "
         else
           ""
       end
@@ -250,7 +250,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
       system cmd
       sleep(3)
 
-      to_joins << "-B:#{File.basename(input_file)},VCF #{output_file}"
+      to_joins << "-V #{output_file}"
     end #each slice
   end #work_dir
   
@@ -284,7 +284,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
 #{slice_of_to_joins.join(" \\\n")}
       "
       intermediate_vcf = File.join(Dir.pwd,"#{alphabet[index]}_#{name_base}_variants.vcf")
-      intermediate_vcfs_to_merge << "-B:#{alphabet[index]}_#{name_base},VCF #{intermediate_vcf}"
+      intermediate_vcfs_to_merge << "-V #{intermediate_vcf}"
       File.open("#{work_dir}-#{alphabet[index]}-joiner.sh","w") do |f|
         f.puts "#!/usr/bin/env bash"
         f.puts "source /etc/profile.d/*.sh"
