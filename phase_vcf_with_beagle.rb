@@ -54,7 +54,7 @@ def produce_likelihood_input_for_beagle(input_vcf,reference)
   gatk -et NO_ET -T ProduceBeagleInput \\
   -R #{reference} \\
   -o #{BEAGLE_LIKELIHOOD_INPUT}  \\
-  -B:variant,VCF #{input_vcf}
+  -V #{input_vcf}
 EOF
   run_command(cmd,"Producing Likelihood for Beagle Failed")
 end
@@ -81,10 +81,10 @@ def convert_beagle_to_vcf(input_vcf,reference,output_vcf)
   gatk -T BeagleOutputToVCF \\
   -R #{reference} \\
   -o #{output_vcf} \\
-  -B:variant,VCF #{input_vcf} \\
-  -B:beagleR2,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.r2 \\
-  -B:beaglePhased,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.phased \\
-  -B:beagleProbs,BEAGLE #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.gprobs
+  -V #{input_vcf} \\
+  -beagleR2 #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.r2 \\
+  -beaglePhased #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.phased \\
+  -beagleProbs #{BEAGLE_OUTPUT_BASENAME}.#{BEAGLE_LIKELIHOOD_INPUT}.gprobs
 EOF
   run_command(cmd,"Failed converting beagle back to VCF")
 end
