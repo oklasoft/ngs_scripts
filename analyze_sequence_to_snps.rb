@@ -274,8 +274,6 @@ EOF
        exit 1
       fi
 
-      <%= variant_quality_score_recalibration(sample_name,@data) if do_vqsr?(data) %>
-
       bgzip <%= sample_name %>_variants.vcf
       tabix <%= sample_name %>_variants.vcf.gz
       EOF
@@ -352,127 +350,6 @@ EOF
     qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
-  end
-
-  # format out the -B options for gatk based on the vqsr data
-  def vqsr_training_data_gatk_opts(vqsr_data)
-    vqsr_data[:training_sets].map do |set|
-      "-B:#{set[:name]},#{set[:type]},#{set[:params]} #{set[:path]}"
-    end.join(" ") + " " +
-    vqsr_data[:annotations].map do |an|
-      "-an #{an}"
-    end.join(" ")
-  end
-
-  # using the vqsr options make up some commands to recalibation variant
-  # quality scores
-  # will do a bunch of stuff
-  def variant_quality_score_recalibration(sample_name,data)
-    vqsr_data = data.first[:vqsr] || @default_config[:vqsr]
-    ERB.new(<<-EOF
-    # VQSR
-
-    # make or work dir & organize our input
-    mkdir 14_vqsr
-
-    # filters we will use later
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variant_filtration -l mem_free=5G \\
-    gatk -et NO_ET -T VariantFiltration \\
-    -R ${GATK_REF} \\
-    -o 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf  \\
-    -B:variant,VCF <%= sample_name %>_variants.vcf \\
-    --filterExpression "\\"MQ0 >= 4 && ((MQ0 / (1.0 * DP)) > 0.1)\\"" \\
-    --filterName "\\"HARD_TO_VALIDATE"\\"
-
-    if [ "$?" -ne "0" ]; then
-     echo -e Failure
-     exit 1
-    fi
-
-    # call VariantRecalibrator
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_recalibrate -l mem_free=5G gatk \\
-    -T VariantRecalibrator -et NO_ET \\
-    -R ${GATK_REF} <%= vqsr_training_data_gatk_opts(vqsr_data) %> \\
-    -B:input,VCF 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf \\
-    -recalFile 14_vqsr/<%= sample_name %>.recal \\
-    -tranchesFile 14_vqsr/<%= sample_name %>.tranches \\
-    -rscriptFile 14_vqsr/<%= sample_name %>_plots.R \\
-    --ignore_filter LowQual \\
-    --ignore_filter HARD_TO_VALIDATE \\
-    --maxGaussians 4
-
-    if [ "$?" -ne "0" ]; then
-     echo -e Failure
-     exit 1
-    fi
-
-    # plot the graphs of the model info
-    R CMD BATCH 14_vqsr/<%= sample_name %>_plots.R logs/<%= sample_name %>_plots.Rout
-
-    if [ "$?" -ne "0" ]; then
-     echo -e Failure
-     exit 1
-    fi
-
-    # we need to get rid of the original one
-    rm -f <%= sample_name %>_variants.vcf*
-
-    # call ApplyRecalibration
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_vqsr_apply -l mem_free=5G \\
-    gatk -T ApplyRecalibration -R ${GATK_REF} \\
-    -B:input,VCF 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf \\
-    --ts_filter_level 99.0 \\
-    -recalFile 14_vqsr/<%= sample_name %>.recal \\
-    -tranchesFile 14_vqsr/<%= sample_name %>.tranches \\
-    -resources ${GATK_BASE}/resources \\
-    -o <%= sample_name %>_variants.vcf
-
-   if [ "$?" -ne "0" ]; then
-    echo -e Failure
-    exit 1
-   fi
-
-    # clean up vqsr data
-    rm -f 14_vqsr/<%= sample_name %>_plots.R \\
-    14_vqsr/<%= sample_name %>.tranches \\
-    14_vqsr/<%= sample_name %>.recal
-
-    bgzip 14_vqsr/<%= sample_name %>_pre_vqsr_variants.vcf
-
-
-  EOF
-    ).result(binding)
-  end
-
-  # check if we have the options for doing vsqr on the VCF,
-  # we'll have some yaml ala:
-  # ---
-  # :vqsr:
-  #   :training_sets:
-  #   - :name: hapmap
-  #     :type: VCF
-  #     :path: hapmap_3.3.b37.sites.vcf
-  #     :params: known=false,training=true,truth=true,prior=15.0
-  #   - :name: omni
-  #     :type: VCF
-  #     :path: 1000G_omni2.5.b37.sites.vcf
-  #     :params: known=false,training=true,truth=false,prior=12.0
-  #   :annotations:
-  #   - HaplotypeScore
-  #   - MQRankSum
-  #   - ReadPosRankSum
-  #   - FS
-  #   - MQ
-  def do_vqsr?(data)
-    return false #This is currently disabled for individuals
-    vqsr_data = data.first[:vqsr] || @default_config[:vqsr]
-    if vqsr_data
-      if vqsr_data[:training_sets] && vqsr_data[:training_sets].size > 0 &&
-        vqsr_data[:annotations] && vqsr_data[:annotations].size >0
-        return true
-      end
-    end
-    return false
   end
 
   # What strand call confidence for UnifiedGenotyper
