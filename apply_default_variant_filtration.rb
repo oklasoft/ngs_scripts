@@ -67,7 +67,7 @@ cmd = <<-EOF
 gatk -et NO_ET -T VariantFiltration \\
 -R #{reference} \\
 -o #{output_vcf}  \\
--B:variant,VCF #{input_vcf} \\
+-V #{input_vcf} \\
 --filterExpression "QUAL < 30.0 || QD < 5.0 || HRun > 5 || SB > -0.10"  \\
 --filterName "GATKStandard" \\
 --filterExpression "MQ0 >= 4 && ((MQ0 / (1.0 * DP)) > 0.1)"  \\
