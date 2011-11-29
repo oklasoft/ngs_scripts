@@ -49,7 +49,7 @@ require 'fileutils'
 def vqsr_training_data_gatk_opts(vqsr_data)
   opts = []
   vqsr_data[:training_sets].each do |set|
-    opts << "-B:#{set[:name]},#{set[:type]},#{set[:params]}"
+    opts << "-resource:#{set[:name]},#{set[:type]},#{set[:params]}"
     opts << set[:path]
   end
   vqsr_data[:annotations].each do |an|
@@ -106,7 +106,7 @@ def variant_recalibrator(data,input_vcf,base_vcf_name)
   cmd = %w/gatk -T VariantRecalibrator -et NO_ET -R/ + [data[:gatk_ref]]
   cmd += vqsr_training_data_gatk_opts(data[:vqsr]) 
   cmd += variant_recalibrator_extra_opts(data[:vqsr]) 
-  cmd += ["-B:input,VCF", input_vcf]
+  cmd += ["-input", input_vcf]
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
   cmd += ["-rscriptFile", vqsr_output_file(base_vcf_name,"R")]
@@ -123,7 +123,7 @@ end
 
 def apply_recalibration(data,input_vcf,base_vcf_name)
   cmd = %w/gatk -T ApplyRecalibration -et NO_ET -R/ + [data[:gatk_ref]]
-  cmd += ["-B:input,VCF", input_vcf]
+  cmd += ["-input", input_vcf]
   cmd += %w/--ts_filter_level 99.0/
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
