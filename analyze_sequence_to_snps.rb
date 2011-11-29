@@ -246,13 +246,7 @@ EOF
   # output a -D SNP rod file, if we have a snp_rod
   def opt_d_rod_path(data)
     if data.first[:snp_rod] || @default_config[:snp_rod]
-      if data.first[:snp_rod] =~ /\.rod$/ || @default_config[:snp_rod] =~ /\.rod$/
-        "-D ${GATK_DBSNP}"
-      elsif data.first[:snp_rod] =~ /\.vcf(\.gz)?$/ || @default_config[:snp_rod] =~ /\.vcf(\.gz)?$/
-        "-B:dbsnp,VCF ${GATK_DBSNP}"
-      else
-        raise "Unknown file format for SNP ROD"
-      end
+      "-D ${GATK_DBSNP}"
     else
       ""
     end
@@ -585,7 +579,7 @@ module load samtools/0.1.12
 module unload picard
 module load picard/1.36
 module unload gatk
-module load gatk/1.1
+module load gatk/1.3
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
