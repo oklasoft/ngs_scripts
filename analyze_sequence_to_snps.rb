@@ -349,11 +349,7 @@ EOF
   # What strand call confidence for UnifiedGenotyper
   # Will depend on if we are doing vqsr
   def unified_genotyper_strand_call_conf(data)
-    if do_vqsr?(data)
-      "20.0"
-    else
-      "30.0"
-    end
+    "30.0"
   end
 
   def script_template()
