@@ -110,7 +110,6 @@ def variant_recalibrator(data,input_vcf,base_vcf_name)
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
   cmd += ["-rscriptFile", vqsr_output_file(base_vcf_name,"R")]
-  cmd += ["-resources", File.join(@gatk_base,"resources")]
   run_command("VariantRecalibrator",cmd)
 end
 
