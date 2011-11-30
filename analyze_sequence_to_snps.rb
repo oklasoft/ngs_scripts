@@ -328,7 +328,7 @@ EOF
 
 
     mkdir 11_calibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates -l mem_free=5G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} <%= opt_d_rod_path(@data) %> -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates -l mem_free=5G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting calibrated covariates"
