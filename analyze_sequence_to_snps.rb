@@ -573,7 +573,7 @@ module load bwa/0.5.9
 module unload samtools
 module load samtools/0.1.12
 module unload picard
-module load picard/1.36
+module load picard/1.56
 module unload gatk
 module load gatk/1.3
 module unload fastqc
