@@ -261,7 +261,7 @@ EOF
       ERB.new(<<-EOF
       # Finally call individuals indels & snps
 
-      qsub -pe threaded 6 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variants -l mem_free=5G gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 6 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+      qsub -pe threaded 1 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variants -l mem_free=5G gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 1 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
 
       if [ "$?" -ne "0" ]; then
        echo -e Failure
