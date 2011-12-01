@@ -59,10 +59,18 @@ def vqsr_training_data_gatk_opts(vqsr_data)
   opts
 end
 
+def apply_recalibration_extra_opts(vqsr_data)
+  extra_opts_for_key(vqsr_data,:apply_recalibration_opts)
+end
+
 def variant_recalibrator_extra_opts(vqsr_data)
+  extra_opts_for_key(vqsr_data,:variant_recalibrator_opts)
+end
+
+def extra_opts_for_key(vqsr_data,key)
   opts = []
-  return opts unless vqsr_data[:variant_recalibrator_opts]
-  vqsr_data[:variant_recalibrator_opts].each do |opt,arg|
+  return opts unless vqsr_data[key]
+  vqsr_data[key].each do |opt,arg|
     opts << "--#{opt}"
     opts << arg.to_s
   end
@@ -122,6 +130,7 @@ end
 
 def apply_recalibration(data,input_vcf,base_vcf_name)
   cmd = %w/gatk -T ApplyRecalibration -et NO_ET -R/ + [data[:gatk_ref]]
+  cmd += apply_recalibration_extra_opts(data[:vqsr])
   cmd += ["-input", input_vcf]
   cmd += %w/--ts_filter_level 99.0/
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
