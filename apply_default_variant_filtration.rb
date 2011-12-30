@@ -40,7 +40,7 @@
 
 input_vcf = ARGV.shift
 
-reference = ARGV.shift || "/Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta"
+reference = ARGV.shift || "/Volumes/hts_core/Shared/homo_sapiens_37/chr_fixed/b37.fasta"
 
 unless input_vcf then
   STDERR.puts "Missing input VCF file"
@@ -56,7 +56,7 @@ end
 
 (base_dir,file) = File.split(input_vcf)
 extension = File.extname(file)
-output_vcf = File.join(base_dir,"#{File.basename(file,extension)}-filtered#{extension}")
+output_vcf = File.join(base_dir,"#{File.basename(file,extension)}-filters#{extension}")
 
 if File.exist?(output_vcf) then
   STDERR.puts "A file with the output name we would use (#{output_vcf}) already exists. I won't overwrite"
