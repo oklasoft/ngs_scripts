@@ -68,10 +68,8 @@ gatk -et NO_ET -T VariantFiltration \\
 -R #{reference} \\
 -o #{output_vcf}  \\
 -V #{input_vcf} \\
---filterExpression "QUAL < 30.0 || QD < 5.0 || HRun > 5 || SB > -0.10"  \\
---filterName "GATKStandard" \\
---filterExpression "MQ0 >= 4 && ((MQ0 / (1.0 * DP)) > 0.1)"  \\
---filterName "HARD_TO_VALIDATE"
+--filterExpression " MQ < 40.0 || QD < 2.0 || FS > 60.0 || HaplotypeScore > 13.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0"  \\
+--filterName "GATKStandard"
 EOF
 
 puts cmd
