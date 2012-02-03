@@ -56,7 +56,7 @@ end
 
 (base_dir,file) = File.split(input_vcf)
 extension = File.extname(file)
-output_vcf = File.join(base_dir,"#{File.basename(file,extension)}-filters#{extension}")
+output_vcf = File.join(base_dir,"#{File.basename(file,extension)}_filters#{extension}")
 
 if File.exist?(output_vcf) then
   STDERR.puts "A file with the output name we would use (#{output_vcf}) already exists. I won't overwrite"
