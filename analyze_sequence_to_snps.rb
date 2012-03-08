@@ -231,7 +231,7 @@ class AnalysisTemplate
         cmd += " --single-end"
       end
       cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-      cleans << "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
+      cleans << "qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
     end
     cleans.join("\n") + <<-EOF
 
@@ -575,7 +575,7 @@ module load samtools/0.1.12
 module unload picard
 module load picard/1.56
 module unload gatk
-module load gatk/1.3
+module load gatk/1.4
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
