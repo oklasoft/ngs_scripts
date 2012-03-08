@@ -308,7 +308,7 @@ EOF
     qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates -l mem_free=4G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
 
     mkdir 10_recalibrated_bam
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate -l mem_free=5G gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %>
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate -l mem_free=5G gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %> --bam_compression 9
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
@@ -655,7 +655,7 @@ fi
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
 mkdir 04_merged_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -681,7 +681,7 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -706,14 +706,14 @@ fi
 
 # Now realign & fix any mate info
 mkdir 07_realigned_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign -l mem_free=5G gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign -l mem_free=5G gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 --bam_compression 9
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure with indel realigmnent"
  exit 1
 fi
 
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure fixing mate info"
