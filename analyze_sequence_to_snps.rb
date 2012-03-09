@@ -178,7 +178,7 @@ class AnalysisTemplate
   end
 
   def create_original_sam_inputs(sample_name,data)
-    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina Illumina #{sample_name}"
+    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -186,7 +186,7 @@ class AnalysisTemplate
         cmd += " single"
       end
 
-      cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]} #{data[index][:lane]}"
+      cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]} #{data[index][:lane]} #{data[index][:quality_type] || "Illumina"}"
 
       # fastq file(s)
       lane_shell_vars.each do |v|
