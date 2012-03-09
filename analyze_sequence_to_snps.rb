@@ -178,7 +178,7 @@ class AnalysisTemplate
   end
 
   def create_original_sam_inputs(sample_name,data)
-    cmd = "qsub -l h_vmem=2G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
+    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -655,7 +655,7 @@ fi
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
 mkdir 04_merged_bam
-qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -681,7 +681,7 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -713,7 +713,7 @@ if [ "$?" -ne "0" ]; then
  exit 1
 fi
 
-qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure fixing mate info"
