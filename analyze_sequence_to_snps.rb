@@ -571,7 +571,7 @@ __END__
 module unload bwa
 module load bwa/0.5.9
 module unload samtools
-module load samtools/0.1.12
+module load samtools/0.1.18
 module unload picard
 module load picard/1.56
 module unload gatk
