@@ -4,6 +4,7 @@ args = ARGV.clone
 # args.shift
 output_base = args.shift
 platform = args.shift
+quality_type = args.shift
 sample = args.shift
 
 index = (ENV['SGE_TASK_ID']||1).to_i - 1
@@ -30,7 +31,7 @@ data = groups[index]
 
 output = File.join(output_base,"#{index}.sam")
 
-cmd = "picard FastqToSam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=1000000 QUALITY_FORMAT=Illumina OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].shift}"
+cmd = "picard FastqToSam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=1000000 QUALITY_FORMAT=#{quality_type} OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].shift}"
 
 unless data[:inputs].empty? then
   cmd += " FASTQ2=#{data[:inputs].shift}"
