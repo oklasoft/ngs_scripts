@@ -336,7 +336,7 @@ EOF
     fi
 
     mkdir 12_recalibrated_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
 
     mkdir 13_final_bam
     # resort & index that bam
