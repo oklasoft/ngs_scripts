@@ -9,7 +9,7 @@ input = ARGV[index]
 output = File.join(output_base,"#{File.basename(input,".sam")}.bam")
 sorted_output = File.join(output_base,"#{File.basename(input,".sam")}-sorted")
 
-cmd = "samtools import #{reference} #{input} #{output}"
+cmd = "samtools view -bt #{reference} -i #{output} #{input}"
 
 puts cmd
 unless system(cmd)
