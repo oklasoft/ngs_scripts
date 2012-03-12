@@ -231,7 +231,7 @@ class AnalysisTemplate
         cmd += " --single-end"
       end
       cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-      cleans << "qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
+      cleans << "qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
     end
     cleans.join("\n") + <<-EOF
 
@@ -305,7 +305,7 @@ EOF
     fi
 
     mkdir 09_original_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -resources ${GATK_BASE}/resources -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
 
     mkdir 10_recalibrated_bam
     qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %> --bam_compression 9
@@ -315,7 +315,7 @@ EOF
      exit 1
     fi
 
-    qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
 
     if [ "$?" -ne "0" ]; then
       echo -e "Failure sorting recalibrated"
@@ -324,11 +324,11 @@ EOF
 
     rm ./10_recalibrated_bam/recalibrated.bam && mv ./10_recalibrated_bam/recalibrated-sorted.bam ./10_recalibrated_bam/recalibrated.bam
 
-    qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bai
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bai
 
 
     mkdir 11_calibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate --recal_file ./11_calibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting calibrated covariates"
@@ -336,12 +336,12 @@ EOF
     fi
 
     mkdir 12_recalibrated_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
 
     mkdir 13_final_bam
     # resort & index that bam
-    qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-    qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
   end
