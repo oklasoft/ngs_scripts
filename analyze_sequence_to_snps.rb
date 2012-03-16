@@ -70,7 +70,7 @@ require 'optparse'
 require 'ostruct'
 
 
-class AnalysisTemplate
+class Template
 
   # Create instance
   # *+default_config+ - Default options
@@ -81,6 +81,64 @@ class AnalysisTemplate
     @sample_name = sample_name
     @data = data
   end #initialize(default_config,sample_name,data)
+
+  def to_s
+    ERB.new(script_template()).result(binding)
+  end
+
+  def bash_header()
+    <<-EOS
+#!/bin/bash
+
+# be sure to start with a fresh & known enviroment (hopefully)
+module unload bwa
+module load bwa/0.5.9
+module unload samtools
+module load samtools/0.1.18
+module unload picard
+module load picard/1.56
+module unload gatk
+module load gatk/1.4
+module unload fastqc
+module load fastqc/0.9.4
+module unload tabix
+module load tabix/0.2.3
+module unload btangs
+module load btangs/1.2.0
+    EOS
+  end
+end
+
+class UnalignedExtractTemplate < Template
+
+  def bam_to_fastq_for_run(run,bam_index)
+    cmd = "bam2fastq --no-aligned --unaligned -o unaligned_fastq/#{@sample_name}_unaligned_#{run[:run]}_#{run[:lane]}\#_sequence.txt 03_first_bam/#{bam_index}.bam"
+    cmd = "qsub -o logs -b y -j y -cwd -V -q all.q -l h_vmem=8G -sync y -N #{@sample_name}_unaligned_#{bam_index} #{cmd}"
+    return cmd
+  end
+
+  def script_template()
+    <<-EOS
+<%= bash_header() %>
+module unload bam2fastq
+module load bam2fastq/1.1.0
+
+mkdir unaligned_fastq
+<% @data.each_with_index do |run,i| %>
+<%= bam_to_fastq_for_run(run,i) %>
+if [ "$?" -ne "0" ]; then
+ echo -e "Failure extracting unalinged from bam <%= i %>"
+ exit 1
+fi
+<% end %>
+qsub -o logs -b y -V -j y -cwd -q all.q -sync y -N <%=@sample_name%>_unaligned_gzip gzip -7 unaligned_fastq/*_sequence.txt
+
+rm -rf 03_first_bam
+    EOS
+  end
+end
+
+class AnalysisTemplate < Template
 
   def fastq_file_list(sample_name,data)
     fastqs = []
@@ -175,6 +233,10 @@ class AnalysisTemplate
       end
     end
     return cmd
+  end
+
+  def extract_unaligned(sample_name,data)
+
   end
 
   def create_original_sam_inputs(sample_name,data)
@@ -356,9 +418,6 @@ EOF
     return DATA.read
   end
 
-  def to_s
-    ERB.new(script_template()).result(binding)
-  end
 end
 
 
@@ -405,8 +464,14 @@ class AnalysisTemplaterApp
   # Make the dir, the analyze script and launch said script for sample_name
   def process_sample(sample_name)
     data = @config[sample_name]
+    data.each_with_index do |d,i|
+      data[i] = @default_config.merge(d)
+    end
     if @options.debug
       puts AnalysisTemplate.new(@default_config,sample_name,data)
+      if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
+        puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
+      end
       return 0
     end
     output_dir = File.join(@options.output_base,sample_name)
@@ -419,6 +484,13 @@ class AnalysisTemplaterApp
     script_file = File.join(output_dir,"analyze.sh")
     File.open(script_file,"w") do |f|
       f.puts AnalysisTemplate.new(@default_config,sample_name,data)
+    end
+
+    if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
+      extract_script_file = File.join(output_dir,"extract_unaligned.sh") 
+      File.open(extract_script_file,"w") do |f|
+        f.puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
+      end
     end
 
     return_dir = Dir.pwd
@@ -565,23 +637,9 @@ if $0 == __FILE__
 end
 
 __END__
-#!/bin/bash
-
-# be sure to start with a fresh & known enviroment (hopefully)
-module unload bwa
-module load bwa/0.5.9
-module unload samtools
-module load samtools/0.1.18
-module unload picard
-module load picard/1.56
-module unload gatk
-module load gatk/1.4
-module unload fastqc
-module load fastqc/0.9.4
-module unload tabix
-module load tabix/0.2.3
-module unload btangs
-module load btangs/1.2.0
+<%=
+  bash_header()
+%>
 
 # It is easier to use variables for thse paths
 GATK_REF=<%= @data.first[:gatk_ref] || @default_config[:gatk_ref] %>
@@ -651,6 +709,7 @@ if [ "$?" -ne "0" ]; then
   echo -e "Failure making first bams"
   exit 1
 fi
+
 
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
@@ -738,8 +797,7 @@ qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc f
 # Clean up after ourselves
 rm -rf 00_inputs \
 01_bwa_aln_sai \
-02_bwa_alignment \
-03_first_bam \
+02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_first_bam" %> \
 04_merged_bam \
 05_dup_marked \
 06_intervals \
@@ -748,6 +806,13 @@ rm -rf 00_inputs \
 10_recalibrated_bam \
 11_calibated_covariates
 
+
+<%=
+  if (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) then
+    cmd = "qsub -o logs -b y -V -j y -cwd -q all.q -m e -N #{@sample_name}_unaligned_extract ./extract_unaligned.sh"
+    cmd
+  end
+%>
 
 # gzip & clean up some of the cleaned input as we keep some it for now, but don't need it fullsized
 <%=
