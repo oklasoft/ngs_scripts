@@ -113,7 +113,7 @@ class UnalignedExtractTemplate < Template
 
   def bam_to_fastq_for_run(run,bam_index)
     cmd = "bam2fastq --no-aligned --unaligned -o unaligned_fastq/#{@sample_name}_unaligned_#{run[:run]}_#{run[:lane]}\#_sequence.txt 03_first_bam/#{bam_index}.bam"
-    cmd = "qsub -o logs -b y -j y -cwd -V -q all.q -l h_vmem=8G -sync y -N #{@sample_name}_unaligned_#{bam_index} #{cmd}"
+    cmd = "qsub -o logs -b y -j y -cwd -V -q all.q -l h_vmem=8G -sync y -N a_#{@sample_name}_unaligned_#{bam_index} #{cmd}"
     return cmd
   end
 
@@ -131,7 +131,7 @@ if [ "$?" -ne "0" ]; then
  exit 1
 fi
 <% end %>
-qsub -o logs -b y -V -j y -cwd -q all.q -sync y -N <%=@sample_name%>_unaligned_gzip gzip -7 unaligned_fastq/*_sequence.txt
+qsub -o logs -b y -V -j y -cwd -q all.q -sync y -N a_<%=@sample_name%>_unaligned_gzip gzip -7 unaligned_fastq/*_sequence.txt
 
 rm -rf 03_first_bam
     EOS
@@ -179,11 +179,11 @@ class AnalysisTemplate < Template
   end
 
   def cleanup_cleaned_fastq_files(sample_name)
-    #qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
+    #qsub -o logs -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
     cmds = []
     @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
       cmds << "rm -f ${#{input}}"
-      cmds << "qsub -o logs -b y -V -j y -cwd -q all.q -N #{sample_name}_gzip_#{i}_rejects gzip #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
+      cmds << "qsub -o logs -b y -V -j y -cwd -q all.q -N a_#{sample_name}_gzip_#{i}_rejects gzip #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
     end
     cmds.join("\n")
   end
@@ -210,7 +210,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -l h_vmem=16G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
+    cmd = "qsub -l h_vmem=16G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N a_#{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -240,7 +240,7 @@ class AnalysisTemplate < Template
   end
 
   def create_original_sam_inputs(sample_name,data)
-    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
+    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N a_#{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -259,7 +259,7 @@ class AnalysisTemplate < Template
   end
 
   def fix_sam_read_group(sample_name,data)
-    cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N #{sample_name}_fix_sam_rg fix_sam_rg_qsub_tasked.rb 02_bwa_alignment Illumina #{sample_name}"
+    cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q all.q -N a_#{sample_name}_fix_sam_rg fix_sam_rg_qsub_tasked.rb 02_bwa_alignment Illumina #{sample_name}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       # rg
       cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}"
@@ -293,7 +293,7 @@ class AnalysisTemplate < Template
         cmd += " --single-end"
       end
       cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-      cleans << "qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N #{sample_name}_clean_#{s_i+1} #{cmd}"
+      cleans << "qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
     end
     cleans.join("\n") + <<-EOF
 
@@ -323,7 +323,7 @@ EOF
       ERB.new(<<-EOF
       # Finally call individuals indels & snps
 
-      qsub -pe threaded 1 -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_variants -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 1 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+      qsub -pe threaded 1 -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_variants -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 1 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
 
       if [ "$?" -ne "0" ]; then
        echo -e Failure
@@ -359,7 +359,7 @@ EOF
 
     mkdir 08_uncalibated_covariates
     # recalibration
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_uncalibrated_covariates -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_uncalibrated_covariates -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -367,17 +367,17 @@ EOF
     fi
 
     mkdir 09_original_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_analyze_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
 
     mkdir 10_recalibrated_bam
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %> --bam_compression 9
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %> --bam_compression 9
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
      exit 1
     fi
 
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
 
     if [ "$?" -ne "0" ]; then
       echo -e "Failure sorting recalibrated"
@@ -386,11 +386,11 @@ EOF
 
     rm ./10_recalibrated_bam/recalibrated.bam && mv ./10_recalibrated_bam/recalibrated-sorted.bam ./10_recalibrated_bam/recalibrated.bam
 
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bai
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bai
 
 
     mkdir 11_calibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_calibrated_covariates -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_calibrated_covariates -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting calibrated covariates"
@@ -398,12 +398,12 @@ EOF
     fi
 
     mkdir 12_recalibrated_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N <%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
+    qsub -o logs -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
 
     mkdir 13_final_bam
     # resort & index that bam
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
   end
@@ -503,7 +503,7 @@ class AnalysisTemplaterApp
 
     # We sleep a random amount to avoid overloading SGE with a billion jobs right away
     sleep(rand(@options.delay))
-    cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N #{sample_name}_full ./analyze.sh"
+    cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q all.q -m e -N a_#{sample_name}_full ./analyze.sh"
     @stdout.puts(cmd)
     system(cmd)
     status = $?.exitstatus
@@ -673,7 +673,7 @@ fi
 
 # Prep all those reads for alignment with bwa aln
 mkdir 01_bwa_aln_sai
-qsub -l h_vmem=8G -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_sam_inputs() %>
+qsub -l h_vmem=8G -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_sam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
@@ -703,7 +703,7 @@ fi
 
 # Going forward let us play with BAM files
 mkdir 03_first_bam
-qsub -l h_vmem=2G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_make_bam make_bam_qsub_tasked.rb 03_first_bam ${GATK_REF} <%= input_sam_bam_files("02_bwa_alignment","sam") %>
+qsub -l h_vmem=2G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_make_bam make_bam_qsub_tasked.rb 03_first_bam ${GATK_REF} <%= input_sam_bam_files("02_bwa_alignment","sam") %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure making first bams"
@@ -714,7 +714,7 @@ fi
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
 mkdir 04_merged_bam
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -722,7 +722,7 @@ if [ "$?" -ne "0" ]; then
 fi
 
 # Make sure it really is sorted & indexed, sometimes things like to complain, just don't let them
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_sort_merged samtools sort ./04_merged_bam/cleaned.bam 04_merged_bam/cleaned-sorted
+qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_sort_merged samtools sort ./04_merged_bam/cleaned.bam 04_merged_bam/cleaned-sorted
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure sorting bams"
@@ -731,7 +731,7 @@ fi
 
 rm ./04_merged_bam/cleaned.bam && mv ./04_merged_bam/cleaned-sorted.bam ./04_merged_bam/cleaned.bam
 
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_index_merged samtools index ./04_merged_bam/cleaned.bam ./04_merged_bam/cleaned.bai
+qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_index_merged samtools index ./04_merged_bam/cleaned.bam ./04_merged_bam/cleaned.bai
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure indexing bams"
@@ -740,14 +740,14 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
   exit 1
 fi
 
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
+qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure indexing duplicate marked bam"
@@ -756,7 +756,7 @@ fi
 
 # Calculate intervals for realignment
 mkdir 06_intervals
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_intervals -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_intervals -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure with target realigment creation"
@@ -765,21 +765,21 @@ fi
 
 # Now realign & fix any mate info
 mkdir 07_realigned_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 --bam_compression 9
+qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -et NO_ET -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 --bam_compression 9
 
 if [ "$?" -ne "0" ]; then
  echo -e "Failure with indel realigmnent"
  exit 1
 fi
 
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure fixing mate info"
   exit 1
 fi
 
-qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_index_fixed samtools index ./07_realigned_bam/cleaned.bam ./07_realigned_bam/cleaned.bai
+qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_index_fixed samtools index ./07_realigned_bam/cleaned.bam ./07_realigned_bam/cleaned.bai
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure indexing"
@@ -790,7 +790,7 @@ fi
 
 # fastqc info
 mkdir qc
-qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q all.q -N <%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
+qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
 
 <%= variant_call(@sample_name,@data) %>
 
@@ -809,7 +809,7 @@ rm -rf 00_inputs \
 
 <%=
   if (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) then
-    cmd = "qsub -o logs -b y -V -j y -cwd -q all.q -m e -N #{@sample_name}_unaligned_extract ./extract_unaligned.sh"
+    cmd = "qsub -o logs -b y -V -j y -cwd -q all.q -m e -N a_#{@sample_name}_unaligned_extract ./extract_unaligned.sh"
     cmd
   end
 %>
