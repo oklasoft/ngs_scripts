@@ -98,13 +98,13 @@ module load samtools/0.1.18
 module unload picard
 module load picard/1.56
 module unload gatk
-module load gatk/1.4
+module load gatk/1.5
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
 module load tabix/0.2.3
 module unload btangs
-module load btangs/1.2.0
+module load btangs/1.3.0
     EOS
   end
 end
