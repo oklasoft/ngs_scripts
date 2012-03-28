@@ -71,8 +71,8 @@ require 'tempfile'
 require 'fileutils'
 
 class PedFixerApp
-  VERSION       = "0.0.9-pre01"
-  REVISION_DATE = "2011-01-04"
+  VERSION       = "1.1.0"
+  REVISION_DATE = "20120328"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2011 Oklahoma Medical Research Foundation"
   
