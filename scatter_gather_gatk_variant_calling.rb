@@ -238,7 +238,7 @@ Dir.chdir(@options.output_base) do
 
       cmd = "qsub #{threaded_queue} -p -10 -m e -o logs -b y -V -j y -cwd \
       -N #{name_base}_variants_#{slice} -l mem_free=4G,virtual_free=4G,h_vmem=6G \
-gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
+gatk -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
 -A AlleleBalance \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
@@ -257,7 +257,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
   slices_of_to_joins = to_joins.each_slice(100000/to_joins.first.length).to_a
   if 1 == slices_of_to_joins.size
     cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
-  -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -et NO_ET -T CombineVariants \\
+  -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
   -genotypeMergeOptions UNSORTED \\
   -R #{@options.reference_path} \\
   -o #{name_base}_variants.vcf"
@@ -276,7 +276,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
     intermediate_vcfs_to_merge = []
     slices_of_to_joins.each_with_index do |slice_of_to_joins,index|
       cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
-      -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -et NO_ET -T CombineVariants \\
+      -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
       -genotypeMergeOptions UNSORTED \\
       -R #{@options.reference_path} \\
       -o #{alphabet[index]}_#{name_base}_variants.vcf"
@@ -295,7 +295,7 @@ gatk -et NO_ET -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
     end
     
     cmd = "qsub -m e -b y -V -j y -cwd -q all.q -N final_#{name_base}_variants_merge \\
-    -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -et NO_ET -T CombineVariants \\
+    -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
     -genotypeMergeOptions UNSORTED \\
     -R #{@options.reference_path} \\
     -o #{name_base}_variants.vcf"
