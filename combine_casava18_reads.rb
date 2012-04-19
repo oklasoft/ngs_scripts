@@ -24,5 +24,6 @@ base_reads.each do |base_lane_read,files|
   puts "#{base_lane_read} joined from #{files.join(", ")}"
   cmd = "zcat #{files.join(" ")} | gzip > #{outdir}/#{base_lane_read}.fastq.gz"
   system("qsub -cwd -V -m e -b y -j y -N #{base_lane_read} \"#{cmd}\"")
+  sleep(0.2)
   puts cmd
 end
