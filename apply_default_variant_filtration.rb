@@ -68,8 +68,18 @@ gatk -et NO_ET -T VariantFiltration \\
 -R #{reference} \\
 -o #{output_vcf}  \\
 -V #{input_vcf} \\
---filterExpression " MQ < 40.0 || QD < 2.0 || FS > 60.0 || HaplotypeScore > 13.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0"  \\
---filterName "GATKStandard"
+--filterExpression "MQ <  40.0" \\
+--filterName "GATK_MQ" \\
+--filterExpression "QD <  2.0" \\
+--filterName "GATK_QD" \\
+--filterExpression "FS >  60.0 &&  SB < -0.1" \\
+--filterName "GATKStrandBias"  \\
+--filterExpression "HaplotypeScore > 13.0" \\
+--filterName "GATK_HS"  \\
+--filterExpression "MQRankSum < -12.5" \\
+--filterName "GATKS_MRS" \\
+--filterExpression "ReadPosRankSum < -8.0"  \\
+--filterName "GATK_RPRS"
 EOF
 
 puts cmd
