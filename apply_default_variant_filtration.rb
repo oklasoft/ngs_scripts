@@ -72,7 +72,7 @@ gatk -et NO_ET -T VariantFiltration \\
 --filterName "GATK_MQ" \\
 --filterExpression "QD <  2.0" \\
 --filterName "GATK_QD" \\
---filterExpression "FS >  60.0 &&  SB < -0.1" \\
+--filterExpression "FS >  60.0 &&  SB > -0.1" \\
 --filterName "GATKStrandBias"  \\
 --filterExpression "HaplotypeScore > 13.0" \\
 --filterName "GATK_HS"  \\
