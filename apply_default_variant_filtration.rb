@@ -64,7 +64,7 @@ if File.exist?(output_vcf) then
 end
 
 cmd = <<-EOF
-gatk -et NO_ET -T VariantFiltration \\
+gatk -T VariantFiltration \\
 -R #{reference} \\
 -o #{output_vcf}  \\
 -V #{input_vcf} \\
