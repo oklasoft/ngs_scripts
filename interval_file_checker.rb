@@ -40,34 +40,37 @@ class Interval
     return true if b.start <= self.start && b.stop >= self.start
   end
 
-  def merge(b)
+  def merge!(b)
+    raise ArgumentError.new("Must be same chromosome") unless self.chr == b.chr
     self.start = [self.start,b.start].min
     self.stop = [self.stop,b.stop].max
   end
 end
 
-merged_intervals = []
-ARGF.each do |line|
-  (chr,start,stop) = line.chomp.scan(/(.*):(\d+)-(\d+)/).first
-  i = Interval.new(chr,start,stop)
-  merged_intervals.each do |mi|
-    if mi.overlaps?(i)
-      mi.merge(i)
-      i = nil
+if __FILE__ == ARGV[0]
+  merged_intervals = []
+  ARGF.each do |line|
+    (chr,start,stop) = line.chomp.scan(/(.*):(\d+)-(\d+)/).first
+    i = Interval.new(chr,start,stop)
+    merged_intervals.each do |mi|
+      if mi.overlaps?(i)
+        mi.merge!(i)
+        i = nil
+      end
     end
+    merged_intervals << i if i
   end
-  merged_intervals << i if i
-end
 
-merged_intervals.sort! do |a,b|
-  if a.chr == b.chr
-    if a.start == b.start
-      a.stop <=> b.stop
+  merged_intervals.sort! do |a,b|
+    if a.chr == b.chr
+      if a.start == b.start
+        a.stop <=> b.stop
+      else
+        a.start <=> b.start
+      end
     else
-      a.start <=> b.start
+      a.chr.to_i <=> b.chr.to_i
     end
-  else
-    a.chr.to_i <=> b.chr.to_i
   end
+  puts merged_intervals.join("\n")
 end
-puts merged_intervals.join("\n")
