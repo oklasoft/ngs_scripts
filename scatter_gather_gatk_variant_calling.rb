@@ -248,7 +248,7 @@ gatk -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
 -L #{input_file}"
       puts cmd
       system cmd
-      sleep(3)
+      sleep(1)
 
       to_joins << "-V #{output_file}"
     end #each slice
