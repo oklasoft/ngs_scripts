@@ -268,6 +268,7 @@ class AnalysisTemplate < Template
   end
 
   def default_rg(sample_name,data)
+    return ""
     return "" if data.first[:is_paired]
     data = data.first
     "--default_read_group #{sample_name}_#{data[:run]}_s_#{data[:lane]} --default_platform Illumina"
@@ -468,6 +469,8 @@ class AnalysisTemplaterApp
       data[i] = @default_config.merge(d)
     end
     if @options.debug
+      puts data.inspect
+      exit 0
       puts AnalysisTemplate.new(@default_config,sample_name,data)
       if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
         puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
