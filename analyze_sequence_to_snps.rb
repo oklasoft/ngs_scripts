@@ -268,6 +268,7 @@ class AnalysisTemplate < Template
   end
 
   def default_rg(sample_name,data)
+    return ""
     return "" if data.first[:is_paired]
     data = data.first
     "--default_read_group #{sample_name}_#{data[:run]}_s_#{data[:lane]} --default_platform Illumina"
@@ -468,6 +469,8 @@ class AnalysisTemplaterApp
       data[i] = @default_config.merge(d)
     end
     if @options.debug
+      puts data.inspect
+      exit 0
       puts AnalysisTemplate.new(@default_config,sample_name,data)
       if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
         puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
@@ -714,7 +717,7 @@ fi
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
 mkdir 04_merged_bam
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_READS_IN_RAM=150000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -740,7 +743,7 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_READS_IN_RAM=150000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
