@@ -47,7 +47,7 @@ class Interval
   end
 end
 
-if __FILE__ == ARGV[0]
+#if __FILE__ == ARGV[0]
   merged_intervals = []
   ARGF.each do |line|
     (chr,start,stop) = line.chomp.scan(/(.*):(\d+)-(\d+)/).first
@@ -73,4 +73,4 @@ if __FILE__ == ARGV[0]
     end
   end
   puts merged_intervals.join("\n")
-end
+#end
