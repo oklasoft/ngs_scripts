@@ -47,10 +47,11 @@ class Interval
   end
 end
 
-if __FILE__ == ARGV[0]
+#if __FILE__ == ARGV[0]
   merged_intervals = []
   ARGF.each do |line|
     (chr,start,stop) = line.chomp.scan(/(.*):(\d+)-(\d+)/).first
+    next unless chr && start && stop
     i = Interval.new(chr,start,stop)
     merged_intervals.each do |mi|
       if mi.overlaps?(i)
@@ -73,4 +74,4 @@ if __FILE__ == ARGV[0]
     end
   end
   puts merged_intervals.join("\n")
-end
+#end
