@@ -98,7 +98,7 @@ module load samtools/0.1.18
 module unload picard
 module load picard/1.56
 module unload gatk
-module load gatk/1.5
+module load gatk/2.0-39-gd091f72
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
@@ -357,21 +357,16 @@ EOF
   def covariate_recalibration(sample_name,data)
     ERB.new(<<-EOF
     # HERE
-
-    mkdir 08_uncalibated_covariates
-    # recalibration
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_uncalibrated_covariates -l mem_free=4G,h_vmem=6G gatk -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./08_uncalibated_covariates/recal_data.csv -nt 8
+    # BaseRecalibrator
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam ./08_uncalibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
      exit 1
     fi
 
-    mkdir 09_original_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_analyze_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -et NO_ET -K ${GATK_BASE}/reg_lupus.omrf.org.key -recalFile ./08_uncalibated_covariates/recal_data.csv -outputDir ./09_original_covariate_analysis
-
     mkdir 10_recalibrated_bam
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T TableRecalibration -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -recalFile ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam <%= default_rg(sample_name,data) %> --bam_compression 9
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.csv -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 9
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
