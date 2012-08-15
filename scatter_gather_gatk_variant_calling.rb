@@ -268,7 +268,7 @@ gatk -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/1.5"
+      f.puts "module load gatk/2.0-39-gd091f72"
       f.puts cmd
     end
   else
@@ -289,7 +289,7 @@ gatk -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
         f.puts "#!/usr/bin/env bash"
         f.puts "source /etc/profile.d/*.sh"
         f.puts "module load sge"
-        f.puts "module load gatk/1.5"
+        f.puts "module load gatk/2.0-39-gd091f72"
         f.puts cmd
       end      
     end
@@ -306,7 +306,7 @@ gatk -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/1.5"
+      f.puts "module load gatk/2.0-39-gd091f72"
       f.puts cmd
     end      
     
