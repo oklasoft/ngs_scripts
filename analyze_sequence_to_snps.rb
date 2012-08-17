@@ -358,7 +358,8 @@ EOF
     ERB.new(<<-EOF
     # HERE
     # BaseRecalibrator
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam ./08_uncalibated_covariates/recal_data.csv -nt 8
+    mkdir 08_uncalibated_covariates
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.csv -nt 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -373,32 +374,14 @@ EOF
      exit 1
     fi
 
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
+    mkdir 13_final_bam
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_sort_recalibrated samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
 
     if [ "$?" -ne "0" ]; then
       echo -e "Failure sorting recalibrated"
       exit 1
     fi
 
-    rm ./10_recalibrated_bam/recalibrated.bam && mv ./10_recalibrated_bam/recalibrated-sorted.bam ./10_recalibrated_bam/recalibrated.bam
-
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_recalibated_realigned samtools index ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated.bai
-
-
-    mkdir 11_calibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_calibrated_covariates -l mem_free=4G,h_vmem=6G gatk -T CountCovariates -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./10_recalibrated_bam/recalibrated.bam -cov ReadGroupCovariate -cov QualityScoreCovariate -cov CycleCovariate -cov DinucCovariate -recalFile ./11_calibated_covariates/recal_data.csv -nt 8
-
-    if [ "$?" -ne "0" ]; then
-     echo -e "Failure counting calibrated covariates"
-     exit 1
-    fi
-
-    mkdir 12_recalibrated_covariate_analysis
-    qsub -o logs -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_analyze_calibrated_covariates -l mem_free=4G,h_vmem=6G java -Xmx4g -jar ${GATK_BASE}/resources/AnalyzeCovariates.jar -et NO_ET -K ${GATK_BASE}/reg_lupus.omrf.org.key -recalFile ./11_calibated_covariates/recal_data.csv -outputDir ./12_recalibrated_covariate_analysis
-
-    mkdir 13_final_bam
-    # resort & index that bam
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
     qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
@@ -712,7 +695,7 @@ fi
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
 mkdir 04_merged_bam
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_READS_IN_RAM=150000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_RECORDS_IN_RAM=150000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -738,7 +721,7 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_READS_IN_RAM=150000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_RECORDS_IN_RAM=150000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
