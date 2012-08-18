@@ -4,6 +4,7 @@
 class Interval
   attr_accessor :chr, :start, :stop
   def initialize(chr,start,stop)
+    raise ArgumentError, "Missing values" unless chr && start && stop && !start.empty? && !chr.empty? && !stop.empty?
     @chr = case chr
            when "X"
              23
@@ -48,30 +49,36 @@ class Interval
 end
 
 #if __FILE__ == ARGV[0]
-  merged_intervals = []
+  merged_intervals = Hash.new {|hash,key| hash[key] = []}
   ARGF.each do |line|
-    (chr,start,stop) = line.chomp.scan(/(.*):(\d+)-(\d+)/).first
-    next unless chr && start && stop
-    i = Interval.new(chr,start,stop)
-    merged_intervals.each do |mi|
+    line.chomp!
+    (chr,start,stop) = line.scan(/(.*):(\d+)-(\d+)/).first
+    i = Interval.new(chr.chomp,start.chomp,stop.chomp)
+    if nil == i
+      raise "Failed to make interval from '#{line}' had chr=#{chr} start=#{start} stop=#{stop}"
+    end
+    merged_intervals[i.chr].each do |mi|
       if mi.overlaps?(i)
         mi.merge!(i)
         i = nil
+        break
       end
     end
-    merged_intervals << i if i
+    merged_intervals[i.chr] << i if i
   end
 
-  merged_intervals.sort! do |a,b|
-    if a.chr == b.chr
-      if a.start == b.start
-        a.stop <=> b.stop
+  merged_intervals.keys.sort.each do |chr|
+    merged_intervals[chr].sort! do |a,b|
+      if a.chr == b.chr
+        if a.start == b.start
+          a.stop <=> b.stop
+        else
+          a.start <=> b.start
+        end
       else
-        a.start <=> b.start
+        a.chr.to_i <=> b.chr.to_i
       end
-    else
-      a.chr.to_i <=> b.chr.to_i
     end
+    puts merged_intervals[chr].join("\n")
   end
-  puts merged_intervals.join("\n")
 #end
