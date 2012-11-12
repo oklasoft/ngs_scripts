@@ -113,6 +113,7 @@ def output_help(out)
   -r, --reference FASTQ     Fasta/q reference file against the BAMs were aligned
   -d, --dbsnp DBSNP         A VCF of SNP info for the UnifiedGenotyper
   -s, --scatter NUM         Scattering into NUM sub instances, defaults to 100
+  --caller TYPE             Which type of caller to use, default UnifiedGenotyper, can be HaplotypeCaller
   --stand_call_conf VAL     Set stand_call_conf for GATK, defaults to 30.0
   --stand_emit_conf VAL     Set stand_emit_conf for GATK, defaults to 10.0
   -t, --threads NUM         Run the GATK with NUM threads, defaults to 1
@@ -126,6 +127,7 @@ def parse_opts(args)
     :scatter_limit => 100,
     :stand_call_conf => 30.0,
     :stand_emit_conf => 10.0,
+    :caller => 'UnifiedGenotyper',
     :verbose => false,
     :debug => false,
     :bam_list => nil,
@@ -156,6 +158,10 @@ def parse_opts(args)
 
     o.on("-t","--threads", "=REQUIRED") do |threads|
       @options.threads = threads.to_i
+    end
+
+    o.on("--caller" "=OPTIONAL") do |conf|
+      @options.caller = conf.to_s
     end
 
     o.on("--stand_call_conf", "=REQUIRED") do |conf|
@@ -238,7 +244,7 @@ Dir.chdir(@options.output_base) do
 
       cmd = "qsub #{threaded_queue} -p -10 -m e -o logs -b y -V -j y -cwd \
       -N #{name_base}_variants_#{slice} -l mem_free=4G,virtual_free=4G,h_vmem=6G \
-gatk -T UnifiedGenotyper -glm BOTH -nt #{@options.threads} \
+gatk -T #{@options.caller} -glm BOTH -nt #{@options.threads} \
 -A AlleleBalance \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
