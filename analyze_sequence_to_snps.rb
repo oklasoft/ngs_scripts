@@ -104,7 +104,7 @@ module load fastqc/0.9.4
 module unload tabix
 module load tabix/0.2.3
 module unload btangs
-module load btangs/1.3.0
+module load btangs/1.4.0
     EOS
   end
 end
@@ -290,6 +290,9 @@ class AnalysisTemplate < Template
     cleans = []
     data.each_with_index do |sequence,s_i|
       cmd = "clean_sample.rb -s #{sample_name} -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
+      if sequence[:trim_end]
+        cmd += " --trim-end #{sequence[:trim_end]}"
+      end
       unless sequence[:is_paired]
         cmd += " --single-end"
       end
@@ -401,8 +404,8 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "1.1.0"
-  REVISION_DATE = "20120328"
+  VERSION       = "1.2.0"
+  REVISION_DATE = "20121112"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012 Oklahoma Medical Research Foundation"
 
