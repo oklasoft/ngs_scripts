@@ -381,7 +381,7 @@ EOF
      exit 1
     fi
 
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_sort_recalibrated samtools sort ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
+    qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_sort_recalibrated samtools sort -m 4000000000 ./10_recalibrated_bam/recalibrated.bam ./10_recalibrated_bam/recalibrated-sorted
 
     if [ "$?" -ne "0" ]; then
       echo -e "Failure sorting recalibrated"
@@ -406,8 +406,8 @@ EOF
 
     mkdir 13_final_bam
     # resort & index that bam
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_sort samtools sort -m 2000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bai
+    qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_sort samtools sort -m 4000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
+    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai
   EOF
     ).result(binding)
   end
@@ -720,7 +720,7 @@ fi
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 # TODO be smarter if there was only a single input
 mkdir 04_merged_bam
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_READS_IN_RAM=150000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_RECORDS_IN_RAM=900000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
@@ -728,7 +728,7 @@ if [ "$?" -ne "0" ]; then
 fi
 
 # Make sure it really is sorted & indexed, sometimes things like to complain, just don't let them
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_merged samtools sort ./04_merged_bam/cleaned.bam 04_merged_bam/cleaned-sorted
+qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_merged samtools sort -m 4000000000 ./04_merged_bam/cleaned.bam 04_merged_bam/cleaned-sorted
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure sorting bams"
@@ -746,7 +746,7 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_READS_IN_RAM=150000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=2 MAX_RECORDS_IN_RAM=900000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -778,7 +778,7 @@ if [ "$?" -ne "0" ]; then
  exit 1
 fi
 
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9 MAX_RECORDS_IN_RAM=900000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure fixing mate info"
