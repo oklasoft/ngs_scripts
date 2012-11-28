@@ -92,7 +92,7 @@ class Template
 
 # be sure to start with a fresh & known enviroment (hopefully)
 module unload bwa
-module load bwa/0.5.9
+module load bwa/0.6.2
 module unload samtools
 module load samtools/0.1.18
 module unload picard
