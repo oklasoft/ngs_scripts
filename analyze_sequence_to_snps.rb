@@ -98,7 +98,7 @@ module load samtools/0.1.18
 module unload picard
 module load picard/1.56
 module unload gatk
-module load gatk/2.0-39-gd091f72
+module load gatk/2.2-13-gab9f9b3
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
@@ -327,7 +327,7 @@ EOF
       ERB.new(<<-EOF
       # Finally call individuals indels & snps
 
-      qsub -pe threaded 1 -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_variants -l mem_free=4G,h_vmem=6G gatk -T UnifiedGenotyper -A AlleleBalance -l INFO -nt 1 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+      qsub -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_variants -l mem_free=4G,h_vmem=6G gatk -T UnifiedGenotyper -A AlleleBalance -l INFO -nct 3 -R ${GATK_REF} -glm BOTH -I ./13_final_bam/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
 
       if [ "$?" -ne "0" ]; then
        echo -e Failure
@@ -362,7 +362,7 @@ EOF
     # HERE
     # BaseRecalibrator
     mkdir 08_uncalibated_covariates
-    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.csv -nt 8
+    qsub -o logs -sync y -b y -V -j y -cwd -q all.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} -knownSites ${GATK_DBSNP} -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.csv -nct 9
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
