@@ -242,10 +242,14 @@ Dir.chdir(@options.output_base) do
           ""
       end
 
+      annotations = ""
+      if "UnifiedGenotyper" == @options.caller
+        annotations = "-A AlleleBalance "
+      end
+
       cmd = "qsub -q ngs.q #{threaded_queue} -p -10 -m e -o logs -b y -V -j y -cwd \
       -N #{name_base}_variants_#{slice} -l mem_free=4G,virtual_free=4G,h_vmem=6G \
-gatk -T #{@options.caller} -glm BOTH -nct #{@options.threads} \
--A AlleleBalance \
+gatk -T #{@options.caller} -glm BOTH -nct #{@options.threads} #{annotations} \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
 -o #{output_file} \
