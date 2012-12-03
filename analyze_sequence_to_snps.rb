@@ -179,6 +179,7 @@ class AnalysisTemplate < Template
   end
 
   def cleanup_cleaned_fastq_files(sample_name)
+    return if @default_config[:opts][:skip_btangs]
     #qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
     cmds = []
     @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
