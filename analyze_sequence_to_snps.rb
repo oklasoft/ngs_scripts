@@ -345,7 +345,7 @@ EOF
   def indel_realign(sample_name,data)
     if @default_config[:opts][:skip_indel_realign]
       return <<-EOF
-        ln -s 05_dup_maked 07_realigned_bam
+        ln -s 05_dup_marked 07_realigned_bam
       EOF
     else
       indel_realignment(sample_name,data)
