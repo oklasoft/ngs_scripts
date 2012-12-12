@@ -342,6 +342,53 @@ EOF
     end
   end
   
+  def indel_realign(sample_name,data)
+    if @default_config[:opts][:skip_indel_realign]
+      return <<-EOF
+        ln -s 05_dup_maked 07_realigned_bam
+      EOF
+    else
+      indel_realignment(sample_name,data)
+    end
+  end
+
+  def indel_realignment(sample_name,data)
+    ERB.new(<<-EOF
+      # Calculate intervals for realignment
+      mkdir 06_intervals
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=4G,h_vmem=6G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
+
+      if [ "$?" -ne "0" ]; then
+       echo -e "Failure with target realigment creation"
+       exit 1
+      fi
+
+      # Now realign & fix any mate info
+      mkdir 07_realigned_bam
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 --bam_compression 9
+
+      if [ "$?" -ne "0" ]; then
+       echo -e "Failure with indel realigmnent"
+       exit 1
+      fi
+
+      qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9 MAX_RECORDS_IN_RAM=900000
+
+      if [ "$?" -ne "0" ]; then
+        echo -e "Failure fixing mate info"
+        exit 1
+      fi
+
+      qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_index_fixed samtools index ./07_realigned_bam/cleaned.bam ./07_realigned_bam/cleaned.bai
+
+      if [ "$?" -ne "0" ]; then
+        echo -e "Failure indexing"
+        exit 1
+      fi
+    EOF
+    ).result(binding)
+  end
+
   def covariate_or_final(sample_name,data)
     if data.first[:snp_rod] || @default_config[:snp_rod]
       covariate_recalibration(sample_name,data)
@@ -354,7 +401,7 @@ EOF
     <<-EOF
     mkdir 13_final_bam
     mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
-    mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bai
+    mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bam.bai
     EOF
   end
 
@@ -427,8 +474,8 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "1.1.5"
-  REVISION_DATE = "20121112"
+  VERSION       = "1.1.6"
+  REVISION_DATE = "20121212"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012 Oklahoma Medical Research Foundation"
 
@@ -458,7 +505,7 @@ class AnalysisTemplaterApp
 
   # Do the work of running this app
   def run_real
-    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false,:skip_vcf => false}}]).first
+    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false,:skip_vcf => false, :skip_indel_realign => false}}]).first
 
     statii = @options.samples.map do |sample_name|
       process_sample(sample_name)
@@ -474,7 +521,7 @@ class AnalysisTemplaterApp
     end
     if @options.debug
       puts data.inspect
-      exit 0
+      #exit 0
       puts AnalysisTemplate.new(@default_config,sample_name,data)
       if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
         puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
@@ -761,37 +808,7 @@ if [ "$?" -ne "0" ]; then
  exit 1
 fi
 
-# Calculate intervals for realignment
-mkdir 06_intervals
-qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_intervals -l mem_free=4G,h_vmem=6G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure with target realigment creation"
- exit 1
-fi
-
-# Now realign & fix any mate info
-mkdir 07_realigned_bam
-qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 --bam_compression 9
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure with indel realigmnent"
- exit 1
-fi
-
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_fixmates picard FixMateInformation INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9 MAX_RECORDS_IN_RAM=900000
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure fixing mate info"
-  exit 1
-fi
-
-qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_index_fixed samtools index ./07_realigned_bam/cleaned.bam ./07_realigned_bam/cleaned.bai
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure indexing"
-  exit 1
-fi
+<%= indel_realign(@sample_name,@data) %>
 
 <%= covariate_or_final(@sample_name,@data) %>
 
