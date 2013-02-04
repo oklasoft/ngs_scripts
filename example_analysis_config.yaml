@@ -3,6 +3,13 @@ DEFAULT:
 - :bwa_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa
   :gatk_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta
   :snp_rod: /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod
+  :recalibration_known_sites:
+  - /Volumes/hts_core/Shared/gatk_resources/b37/dbsnp_132.b37.vcf
+  - /Volumes/hts_core/Shared/gatk_resources/b37/other_dbsnp_132.b37.vcf
+  :known_indels:
+  - /Volumes/hts_core/Shared/some_indel.vcf
+  - /Volumes/hts_core/Shared/some_other_indel.vcf
+  :quality_type: "Standard"
   :opts:
     :skip_btangs: false
     :skip_vcf: false
