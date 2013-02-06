@@ -344,7 +344,7 @@ EOF
   
   def known_indels_opts()
     if @default_config[:known_indels]
-      return @default_config[:known_indels].map {|i| "--known #{i}"}.join(" ")
+      return @default_config[:known_indels].map {|i| "-known #{i}"}.join(" ")
     else
       return ""
     end
@@ -438,14 +438,16 @@ EOF
     fi
 
     mkdir 13_final_bam
-    qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_sort_recalibrated samtools sort -m 4000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
+    #qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_sort_recalibrated samtools sort -m 4000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
 
-    if [ "$?" -ne "0" ]; then
-      echo -e "Failure sorting recalibrated"
-      exit 1
-    fi
+    #if [ "$?" -ne "0" ]; then
+      #echo -e "Failure sorting recalibrated"
+      #exit 1
+    #fi
 
-    qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai
+    mv ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>.bam
+    mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bam.bai
+    #qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai
   EOF
     ).result(binding)
   end
