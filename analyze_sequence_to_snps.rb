@@ -184,7 +184,7 @@ class AnalysisTemplate < Template
     cmds = []
     @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
       cmds << "rm -f ${#{input}}"
-      cmds << "qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_gzip_#{i}_rejects gzip #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
+      cmds << "qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_gzip_#{i}_rejects gzip -9 #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
     end
     cmds.join("\n")
   end
@@ -704,7 +704,9 @@ SAMPLE="<%= @sample_name %>"
   clean_commands(@sample_name,@data)
 %>
 
-# TODO samtools flagstat logged on each bam?
+# fastqc info
+mkdir qc
+qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
 mkdir 00_inputs
@@ -805,8 +807,7 @@ fi
 <%= covariate_or_final(@sample_name,@data) %>
 
 # fastqc info
-mkdir qc
-qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %> ./13_final_bam/<%= @sample_name %>.bam
+qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
 <%= variant_call(@sample_name,@data) %>
 
