@@ -739,15 +739,6 @@ if [ "$?" -ne "0" ]; then
   exit 1
 fi
 
-# Since bwa right now doesn't add read group info correctly (it is not doing it for unmapped), manually add read group
-<%=
-  fix_sam_read_group(@sample_name,@data)
-%>
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure with SAM RG fix"
- exit 1
-fi
 
 # Going forward let us play with BAM files
 mkdir 03_first_bam
