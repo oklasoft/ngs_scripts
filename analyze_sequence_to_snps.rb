@@ -104,7 +104,7 @@ module load fastqc/0.9.4
 module unload tabix
 module load tabix/0.2.3
 module unload btangs
-module load btangs/1.4.0
+module load btangs/1.5.0
     EOS
   end
 end
@@ -298,7 +298,7 @@ class AnalysisTemplate < Template
         cmd += " --single-end"
       end
       cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-      cleans << "qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
+      cleans << "qsub -pe threaded 2 -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
     end
     cleans.join("\n") + <<-EOF
 
