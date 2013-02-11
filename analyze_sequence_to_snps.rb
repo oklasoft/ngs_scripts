@@ -91,6 +91,7 @@ class Template
 #!/bin/bash
 
 # be sure to start with a fresh & known enviroment (hopefully)
+source /etc/profile.d/*.sh
 module unload bwa
 module load bwa/0.6.2
 module unload samtools
@@ -298,7 +299,7 @@ class AnalysisTemplate < Template
         cmd += " --single-end"
       end
       cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-      cleans << "qsub -pe threaded 2 -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
+      cleans << "qsub -pe threaded 2 -l hadoop=1,h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
     end
     cleans.join("\n") + <<-EOF
 
@@ -699,6 +700,7 @@ SAMPLE="<%= @sample_name %>"
   fastq_file_list(@sample_name,@data)
 %>
 
+if [ ! -e 05_dup_marked/cleaned.bam ]; then
 # initial PCR clean by 'bins' via btangs
 <%=
   clean_commands(@sample_name,@data)
@@ -751,7 +753,6 @@ fi
 
 
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
-# TODO be smarter if there was only a single input
 mkdir 04_merged_bam
 qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=900000
 
@@ -793,6 +794,26 @@ if [ "$?" -ne "0" ]; then
  exit 1
 fi
 
+# TODO stop here if pre_gatk only
+if [ "$PRE_GATK_ONLY" == "Y" ]; then
+rm -rf 00_inputs \
+01_bwa_aln_sai \
+02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_first_bam" %> \
+04_merged_bam 
+<%=
+  cleanup_cleaned_fastq_files(@sample_name)
+%>
+
+rm -f qc/*.zip
+
+touch finished.txt
+exit 0
+fi
+else
+  rm -f finished.txt
+fi #if 05_dup_marked/cleaned.bam already existed
+# start here if pre_gatk already done
+
 <%= indel_realign(@sample_name,@data) %>
 
 <%= covariate_or_final(@sample_name,@data) %>
@@ -823,9 +844,11 @@ rm -rf 00_inputs \
 %>
 
 # gzip & clean up some of the cleaned input as we keep some it for now, but don't need it fullsized
+if [ "$PRE_GATK_ONLY" != "Y" ]; then
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
+fi
 
 rm -f qc/*.zip
 
