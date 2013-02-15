@@ -467,10 +467,10 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "1.2.0"
-  REVISION_DATE = "20121212"
+  VERSION       = "2.0.0"
+  REVISION_DATE = "20130215"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
-  COPYRIGHT     = "Copyright (c) 2012 Oklahoma Medical Research Foundation"
+  COPYRIGHT     = "Copyright (c) 2012-2013 Oklahoma Medical Research Foundation"
 
   # Set up the app to roun
   # *+args+ - command line ARGS formatted type array
