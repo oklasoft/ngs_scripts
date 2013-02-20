@@ -398,6 +398,35 @@ EOF
     ).result(binding)
   end
 
+  def mark_dupes_or_skip(sample_name,data)
+    if @default_config[:opts][:skip_dupes]
+      <<-EOF
+mv ./04_merged_bam/cleaned.bam 05_dup_marked/
+mv ./04_merged_bam/cleaned.bai 05_dup_marked/
+      EOF
+    else
+      mark_dupes(sample_name,data)
+    end
+  end
+  
+  def mark_dupes(sample_name,data)
+    <<-EOF
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=900000
+
+if [ "$?" -ne "0" ]; then
+  echo -e "Failure with marking the duplicates"
+  exit 1
+fi
+
+qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
+
+if [ "$?" -ne "0" ]; then
+ echo -e "Failure indexing duplicate marked bam"
+ exit 1
+fi
+    EOF
+  end
+
   def covariate_or_final(sample_name,data)
     if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
       covariate_recalibration(sample_name,data)
@@ -467,7 +496,7 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "2.0.1"
+  VERSION       = "2.1.0"
   REVISION_DATE = "20130215"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012-2013 Oklahoma Medical Research Foundation"
@@ -498,7 +527,7 @@ class AnalysisTemplaterApp
 
   # Do the work of running this app
   def run_real
-    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false,:skip_vcf => false, :skip_indel_realign => false}}]).first
+    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false, :skip_dupes =>false, :skip_vcf => false, :skip_indel_realign => false}}]).first
 
     statii = @options.samples.map do |sample_name|
       process_sample(sample_name)
@@ -780,19 +809,8 @@ fi
 
 # Mark duplicates with picard
 mkdir 05_dup_marked
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_mark_dups picard MarkDuplicates INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=900000
+<%= mark_dupes_or_skip(@sample_name,@data) %>$
 
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure with marking the duplicates"
-  exit 1
-fi
-
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure indexing duplicate marked bam"
- exit 1
-fi
 
 # TODO stop here if pre_gatk only
 if [ "$PRE_GATK_ONLY" == "Y" ]; then
