@@ -180,7 +180,7 @@ class AnalysisTemplate < Template
   end
 
   def cleanup_cleaned_fastq_files(sample_name)
-    return if @default_config[:opts][:skip_btangs]
+    return "echo nop" if @default_config[:opts][:skip_btangs]
     #qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
     cmds = []
     @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
@@ -467,7 +467,7 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "2.0.0"
+  VERSION       = "2.0.1"
   REVISION_DATE = "20130215"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012-2013 Oklahoma Medical Research Foundation"
