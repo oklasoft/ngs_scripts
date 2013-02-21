@@ -42,11 +42,14 @@ require 'ostruct'
 require 'optparse'
 
 class Interval
-  attr_reader :chr, :start, :stop
-  def initialize(chr,start,stop)
+  attr_reader :chr, :start, :stop, :strand, :name, :headers
+  def initialize(chr,start,stop,strand=nil,name=nil,headers=nil)
     @chr = chr
     @start = start.to_i
     @stop = stop.to_i
+    @strand = strand
+    @name = name
+    @headers = headers
   end
 
   def size
@@ -58,22 +61,47 @@ class Interval
     if mid <= @start || mid >= @stop || mid+1 >= @stop
       return self
     end
-    return [self.class.new(@chr,@start,mid), self.class.new(@chr,mid+1,@stop)]
-  end
-
-  def to_s
-    "#{@chr}:#{@start}-#{@stop}"
+    return [self.class.new(@chr,@start,mid,@strand,@name,@headers), self.class.new(@chr,mid+1,@stop,@strand,@name,@headers)]
   end
 
   def self.intervals_from_file(file)
     res = []
+    headers = []
+    mode = :first
     IO.foreach(file) do |l|
-      res << self.new(*l.chomp.scan(/(.*):(\d+)-(\d+)/).first)
+      if :first == mode
+        if l =~ /^@/ then
+          mode = :picard
+        else
+          mode = :bed
+        end
+      end
+      if :bed == mode
+        (chr,start,stop) = l.chomp.scan(/(.*):(\d+)-(\d+)/).first
+        res << BedInterval.new(chr,start,stop,nil,nil,nil)
+      elsif :picard == mode
+        if l =~ /^@/ then
+          headers << l.chomp
+        else
+          (chr,start,stop,strand,name) = l.chomp.split(/\t/)
+          res << PicardInterval.new(chr,start,stop,strand,name,headers)
+        end
+      end
     end
     return res
   end
 end
 
+class BedInterval < Interval
+  def to_s
+    "#{@chr}:#{@start}-#{@stop}"
+  end
+end
+class PicardInterval < Interval
+  def to_s
+    "#{@chr}\t#{@start}\t#{@stop}\t#{@strand}\t#{@name}"
+  end
+end
 def normalize_interval_sizes(intervals,max_size)
   new_intervals = intervals.clone
   begin
@@ -225,7 +253,12 @@ Dir.chdir(@options.output_base) do
 
       sliced_interval_file = "sliced_interval_#{slice}.interval_list"
       File.open(sliced_interval_file,"w") do |f|
-        f.puts sliced_intervals.join("\n")
+        if BedInterval == sliced_intervals.first.class
+          f.puts sliced_intervals.join("\n")
+        elsif PicardInterval == sliced_intervals.first.class
+          f.puts sliced_intervals.first.headers.join("\n")
+          f.puts sliced_intervals.join("\n")
+        end
       end
 
       output_file = File.join(Dir.pwd,"#{name_base}_#{slice}_variants.vcf")
