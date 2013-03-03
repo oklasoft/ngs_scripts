@@ -90,6 +90,8 @@ class Template
     <<-EOS
 #!/bin/bash
 
+cd "$( dirname "${BASH_SOURCE[0]}" )"
+
 # be sure to start with a fresh & known enviroment (hopefully)
 source /etc/profile.d/*.sh
 module unload bwa
@@ -180,7 +182,7 @@ class AnalysisTemplate < Template
   end
 
   def cleanup_cleaned_fastq_files(sample_name)
-    return "echo nop" if @default_config[:opts][:skip_btangs]
+    return "echo noop" if @default_config[:opts][:skip_btangs]
     #qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
     cmds = []
     @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
