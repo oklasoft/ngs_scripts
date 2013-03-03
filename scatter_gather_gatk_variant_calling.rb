@@ -313,7 +313,7 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/2.0-39-gd091f72"
+      f.puts "module load gatk/2.4-3-g2a7af43"
       f.puts cmd
     end
   else
@@ -334,7 +334,7 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
         f.puts "#!/usr/bin/env bash"
         f.puts "source /etc/profile.d/*.sh"
         f.puts "module load sge"
-        f.puts "module load gatk/2.0-39-gd091f72"
+        f.puts "module load gatk/2.4-3-g2a7af43"
         f.puts cmd
       end      
     end
@@ -351,7 +351,7 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/2.0-39-gd091f72"
+      f.puts "module load gatk/2.4-3-g2a7af43"
       f.puts cmd
     end      
     
