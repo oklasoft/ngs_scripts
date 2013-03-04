@@ -111,9 +111,9 @@ def run_command(name,cmd)
 end
 
 def variant_recalibrator(data,input_vcf,base_vcf_name)
-  cmd = %w/gatk -T VariantRecalibrator -et NO_ET -R/ + [data[:gatk_ref]]
-  cmd += vqsr_training_data_gatk_opts(data[:vqsr]) 
-  cmd += variant_recalibrator_extra_opts(data[:vqsr]) 
+  cmd = %w/gatk -T VariantRecalibrator -R/ + [@config[:gatk_ref]]
+  cmd += vqsr_training_data_gatk_opts(data) 
+  cmd += variant_recalibrator_extra_opts(data) 
   cmd += ["-input", input_vcf]
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
@@ -129,8 +129,8 @@ end
 
 
 def apply_recalibration(data,input_vcf,base_vcf_name)
-  cmd = %w/gatk -T ApplyRecalibration -et NO_ET -R/ + [data[:gatk_ref]]
-  cmd += apply_recalibration_extra_opts(data[:vqsr])
+  cmd = %w/gatk -T ApplyRecalibration -R/ + [@config[:gatk_ref]]
+  cmd += apply_recalibration_extra_opts(data)
   cmd += ["-input", input_vcf]
   cmd += %w/--ts_filter_level 99.0/
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
@@ -142,7 +142,7 @@ end
 # check if we have the options for doing vsqr on the VCF,
 # we'll have some yaml ala:
 # ---
-# :vqsr:
+# :vqsr_$MODE:
 #   :training_sets:
 #   - :name: hapmap
 #     :type: VCF
@@ -193,6 +193,7 @@ def output_help(out)
   -D, --debug               Enable debuging
   -o, --output DIR          Save output in DIR
   -i, --input VCF           Input VCF to be VQSRed
+  -m, --mode SNP|INDEL      Run as either SNP or INDEL (or some other mode, used to find vqsr_opts)
   -c, --config YAML         A configuration YAML, has more specific flags for VQSR
 EOF
 end
@@ -203,7 +204,9 @@ def parse_opts(args)
     :verbose => false,
     :debug => false,
     :input_vcf_path => nil,
+    :mode => nil,
     :config_path => nil
+
   )
   
   opts = OptionParser.new() do |o|
@@ -223,12 +226,16 @@ def parse_opts(args)
     o.on("-c","--config", "=REQUIRED") do |path|
       @options.config_path = File.expand_path(path)
     end
+
+    o.on("-m","--mode", "=REQUIRED") do |mode|
+      @options.mode = mode
+    end
   end
 
   opts.parse!(args)  
 
-  unless @options.input_vcf_path && @options.config_path
-    $stderr.puts "Need at least an input VCF & an input config file"
+  unless @options.input_vcf_path && @options.config_path && @options.mode
+    $stderr.puts "Need at least an input VCF & an input config file & mode"
     $stderr.puts ""
     output_help($stderr)
     exit 1
@@ -251,8 +258,9 @@ end
 
 parse_opts(ARGV)
 load_config_data(@options.config_path)
-unless do_vqsr?(@config[:vqsr])
-  $stderr.puts "Missing VQSR config options in YAML file"
+@vqsr_opts = @config["vqsr_#{@options.mode}".to_sym]
+unless do_vqsr?(@vqsr_opts)
+  $stderr.puts "Missing VQSR config options in YAML file for #{@options.mode}"
   exit(1)
 end
 @gatk_base = File.dirname(File.dirname(gatk_path))
@@ -263,9 +271,9 @@ Dir.chdir(@options.output_base_dir) do
   work_dir = "#{Time.now.strftime("%Y%m%d")}_vqsr_vcf_work.#{$$}"
   raise "Can't make work dir" unless Dir.mkdir(work_dir)
   Dir.chdir(work_dir) do
-    unless variant_recalibrator(@config,@options.input_vcf_path,base_vcf_name) &&
-      make_plots(@config,@options.input_vcf_path,base_vcf_name) &&
-      apply_recalibration(@config,@options.input_vcf_path,base_vcf_name)
+    unless variant_recalibrator(@vqsr_opts,@options.input_vcf_path,base_vcf_name) &&
+      make_plots(@vqsr_opts,@options.input_vcf_path,base_vcf_name) &&
+      apply_recalibration(@vqsr_opts,@options.input_vcf_path,base_vcf_name)
       exit(1)
     else
       FileUtils.move(vqsr_output_file(base_vcf_name,"R.pdf"),File.join("..","#{base_vcf_name}-vqsr_recalibrated.pdf"))
