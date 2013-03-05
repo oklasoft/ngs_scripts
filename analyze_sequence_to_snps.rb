@@ -107,7 +107,7 @@ module load fastqc/0.9.4
 module unload tabix
 module load tabix/0.2.3
 module unload btangs
-module load btangs/1.5.0
+module load btangs/1.6.0
     EOS
   end
 end
