@@ -282,7 +282,7 @@ Dir.chdir(@options.output_base) do
         glm = "-glm BOTH"
       end
 
-      cmd = "qsub -q ngs.q #{threaded_queue} -p -10 -m e -o logs -b y -V -j y -cwd \
+      cmd = "qsub -q ngs.q #{threaded_queue} -p -50 -m e -o logs -b y -V -j y -cwd \
       -N #{name_base}_variants_#{slice} -l mem_free=4G,virtual_free=4G,h_vmem=6G \
 gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
 -R #{@options.reference_path} #{snp_opt} \
