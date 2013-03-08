@@ -732,6 +732,7 @@ SAMPLE="<%= @sample_name %>"
 %>
 
 mkdir tmp || exit 1
+export GATK_JAVA_OPTS="-Djava.io.tmpdir=./tmp"
 
 if [ ! -e 05_dup_marked/cleaned.bam ]; then
 # initial PCR clean by 'bins' via btangs
