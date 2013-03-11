@@ -746,14 +746,16 @@ qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc
 
 # setup input sams, will get illumina scores to standard sanger
 mkdir 00_inputs
+export JAVA_MEM_OPTS="-Xmx16G"
 <%=
   create_original_sam_inputs(@sample_name,@data)
 %>
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure converting fastq to sam"
+  echo -e "Failure converting fastq to bam"
   exit 1
 fi
+unset JAVA_MEM_OPTS
 
 # Prep all those reads for alignment with bwa aln
 mkdir 01_bwa_aln_sai
