@@ -29,25 +29,13 @@ end
 
 data = groups[index]
 
-output = File.join(output_base,"#{index}.sam")
+output = File.join(output_base,"#{index}.bam")
 
-cmd = "picard FastqToSam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=1000000 QUALITY_FORMAT=#{data[:quality]} OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].shift}"
+cmd = "picard FastqToSam TMP_DIR=./tmp VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 QUALITY_FORMAT=#{data[:quality]} OUTPUT=#{output} READ_GROUP_NAME=#{data[:id]} SAMPLE_NAME=#{sample} PLATFORM=#{platform} PLATFORM_UNIT=#{data[:unit]} FASTQ=#{data[:inputs].shift}"
 
 unless data[:inputs].empty? then
   cmd += " FASTQ2=#{data[:inputs].shift}"
 end
-
-puts cmd
-STDOUT.flush
-
-unless system(cmd)
-  STDERR.puts "Failed with picard"
-  exit 1
-end
-
-output_bam = File.join(output_base,"#{index}.bam")
-
-cmd = "samtools view -bhS #{output} > #{output_bam}"
 
 puts cmd
 STDOUT.flush
