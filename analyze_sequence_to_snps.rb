@@ -177,7 +177,7 @@ class AnalysisTemplate < Template
   end
 
 
-  def ordered_sam_inputs()
+  def ordered_bam_inputs()
     @input_sam_files.map {|s| "#{s[:b_index]} ./00_inputs/#{s[:index]}.bam"}.join(" ")
   end
 
@@ -755,11 +755,10 @@ if [ "$?" -ne "0" ]; then
   echo -e "Failure converting fastq to bam"
   exit 1
 fi
-unset JAVA_MEM_OPTS
 
 # Prep all those reads for alignment with bwa aln
 mkdir 01_bwa_aln_sai
-qsub -l h_vmem=8G -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_sam_inputs() %>
+qsub -l h_vmem=8G -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_bam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
