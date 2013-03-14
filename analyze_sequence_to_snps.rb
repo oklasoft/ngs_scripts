@@ -382,7 +382,7 @@ EOF
       # Now realign & fix any mate info
       mkdir 07_realigned_bam
       unset JAVA_MEM_OPTS
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with indel realigmnent"
@@ -429,7 +429,7 @@ fi
     <<-EOF
     mkdir 13_final_bam
     mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
-    mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bam.bai
+    mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bai
     EOF
   end
 
@@ -450,7 +450,7 @@ fi
     fi
 
     mkdir 10_recalibrated_bam
-    qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 9
+    qsub -pe threaded 3 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 9 -nct 4
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
@@ -787,6 +787,7 @@ if [ "$PRE_GATK_ONLY" == "Y" ]; then
 rm -rf 00_inputs \
 01_bwa_aln_sai \
 02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
+tmp
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
@@ -798,6 +799,7 @@ exit 0
 fi
 else
   rm -f finished.txt
+  mkdir tmp
 fi #if 05_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
