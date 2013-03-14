@@ -367,7 +367,7 @@ EOF
     ERB.new(<<-EOF
       # Calculate intervals for realignment
       mkdir 06_intervals
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=4G,h_vmem=6G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals
+      qsub -pe threaded 12 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=8G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nct 12
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with target realigment creation"
@@ -376,25 +376,12 @@ EOF
 
       # Now realign & fix any mate info
       mkdir 07_realigned_bam
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 --bam_compression 9
+      unset JAVA_MEM_OPTS
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with indel realigmnent"
        exit 1
-      fi
-
-      qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_fixmates picard FixMateInformation TMP_DIR=./tmp INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9 MAX_RECORDS_IN_RAM=3000000
-
-      if [ "$?" -ne "0" ]; then
-        echo -e "Failure fixing mate info"
-        exit 1
-      fi
-
-      qsub -l h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_index_fixed samtools index ./07_realigned_bam/cleaned.bam ./07_realigned_bam/cleaned.bai
-
-      if [ "$?" -ne "0" ]; then
-        echo -e "Failure indexing"
-        exit 1
       fi
     EOF
     ).result(binding)
