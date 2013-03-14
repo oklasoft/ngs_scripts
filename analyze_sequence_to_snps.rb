@@ -403,8 +403,11 @@ EOF
   def mark_dupes_or_skip(sample_name,data)
     if @default_config[:opts][:skip_dupes]
       <<-EOF
-mv ./04_merged_bam/cleaned.bam 05_dup_marked/
-mv ./04_merged_bam/cleaned.bai 05_dup_marked/
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=./tmp #{input_sam_bam_files("03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True USE_THREADING=True
+if [ "$?" -ne "0" ]; then
+  echo -e "Failure with merging the sams"
+  exit 1
+fi
       EOF
     else
       mark_dupes(sample_name,data)
@@ -413,18 +416,11 @@ mv ./04_merged_bam/cleaned.bai 05_dup_marked/
   
   def mark_dupes(sample_name,data)
     <<-EOF
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_mark_dups picard MarkDuplicates TMP_DIR=./tmp INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=3000000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=./tmp #{input_sam_bam_files("03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
   exit 1
-fi
-
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_index_merged_dup samtools index ./05_dup_marked/cleaned.bam ./05_dup_marked/cleaned.bai
-
-if [ "$?" -ne "0" ]; then
- echo -e "Failure indexing duplicate marked bam"
- exit 1
 fi
     EOF
   end
@@ -778,42 +774,18 @@ fi
 
 
 # Going forward let us play with BAM files
-mkdir 03_first_bam
-qsub -l h_vmem=2G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_make_bam make_bam_qsub_tasked.rb 03_first_bam ${GATK_REF} <%= input_sam_bam_files("02_bwa_alignment","sam") %>
+# We will sort the individual aligned SAM files so we can merge, sort, & mark dupes in one action
+mkdir 03_sorted_bams
+qsub -l h_vmem=30G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_sams sort_sam_qsub_tasked.rb 03_sorted_bams <%= input_sam_bam_files("02_bwa_alignment","sam") %>
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure making first bams"
+  echo -e "Failure sorting aligned sams"
   exit 1
 fi
 
 
-# Now we might have had many input sets, so let us merge those all into a single BAM using picard
-mkdir 04_merged_bam
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles TMP_DIR=./tmp <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure merging bams"
-  exit 1
-fi
-
-# Make sure it really is sorted & indexed, sometimes things like to complain, just don't let them
-qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_merged samtools sort -m 4000000000 ./04_merged_bam/cleaned.bam 04_merged_bam/cleaned-sorted
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure sorting bams"
-  exit 1
-fi
-
-rm ./04_merged_bam/cleaned.bam && mv ./04_merged_bam/cleaned-sorted.bam ./04_merged_bam/cleaned.bam
-
-qsub -l h_vmem=2G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_index_merged samtools index ./04_merged_bam/cleaned.bam ./04_merged_bam/cleaned.bai
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure indexing bams"
-  exit 1
-fi
-
-# Mark duplicates with picard
+# Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
+# While we do that we shall also sort it, mark possible duplicates & make an index
 mkdir 05_dup_marked
 <%= mark_dupes_or_skip(@sample_name,@data) %>$
 
@@ -822,8 +794,7 @@ mkdir 05_dup_marked
 if [ "$PRE_GATK_ONLY" == "Y" ]; then
 rm -rf 00_inputs \
 01_bwa_aln_sai \
-02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_first_bam" %> \
-04_merged_bam 
+02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
