@@ -244,7 +244,7 @@ class AnalysisTemplate < Template
   end
 
   def create_original_sam_inputs(sample_name,data)
-    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_convert_to_sam convert_fastq_to_sam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
+    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_convert_to_sam convert_fastq_to_bam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -383,7 +383,7 @@ EOF
        exit 1
       fi
 
-      qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_fixmates picard FixMateInformation TMP_DIR=./tmp INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9 MAX_RECORDS_IN_RAM=900000
+      qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_fixmates picard FixMateInformation TMP_DIR=./tmp INPUT=./07_realigned_bam/cleaned.bam SO=coordinate VALIDATION_STRINGENCY=SILENT COMPRESSION_LEVEL=9 MAX_RECORDS_IN_RAM=3000000
 
       if [ "$?" -ne "0" ]; then
         echo -e "Failure fixing mate info"
@@ -413,7 +413,7 @@ mv ./04_merged_bam/cleaned.bai 05_dup_marked/
   
   def mark_dupes(sample_name,data)
     <<-EOF
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_mark_dups picard MarkDuplicates TMP_DIR=./tmp INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=900000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_mark_dups picard MarkDuplicates TMP_DIR=./tmp INPUT=./04_merged_bam/cleaned.bam OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=3000000
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -731,7 +731,7 @@ SAMPLE="<%= @sample_name %>"
   fastq_file_list(@sample_name,@data)
 %>
 
-mkdir tmp || exit 1
+mkdir tmp
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=./tmp"
 
 if [ ! -e 05_dup_marked/cleaned.bam ]; then
@@ -790,7 +790,7 @@ fi
 
 # Now we might have had many input sets, so let us merge those all into a single BAM using picard
 mkdir 04_merged_bam
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles TMP_DIR=./tmp <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=900000
+qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_merge_bams picard MergeSamFiles TMP_DIR=./tmp <%= input_sam_bam_files("INPUT=./03_first_bam","bam") %> OUTPUT=./04_merged_bam/cleaned.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT COMPRESSION_LEVEL=7 MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure merging bams"
