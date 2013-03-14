@@ -364,6 +364,11 @@ EOF
   end
 
   def indel_realignment(sample_name,data)
+    compression = if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
+                    ""
+                  else
+                    "--bam_compression 9"
+                  end
     ERB.new(<<-EOF
       # Calculate intervals for realignment
       mkdir 06_intervals
