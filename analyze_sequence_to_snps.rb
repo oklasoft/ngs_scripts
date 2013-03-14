@@ -99,7 +99,7 @@ module load bwa/0.6.2
 module unload samtools
 module load samtools/0.1.18
 module unload picard
-module load picard/1.56
+module load picard/1.86
 module unload gatk
 module load gatk/2.4-3-g2a7af43
 module unload fastqc
