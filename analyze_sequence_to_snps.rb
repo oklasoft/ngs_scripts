@@ -101,7 +101,7 @@ module load samtools/0.1.18
 module unload picard
 module load picard/1.86
 module unload gatk
-module load gatk/2.4-3-g2a7af43
+module load gatk/2.4-7-g5e89f01
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
