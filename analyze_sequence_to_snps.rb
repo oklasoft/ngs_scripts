@@ -344,6 +344,38 @@ EOF
       ).result(binding)
     end
   end
+
+  def reduce_reads(sample_name,data)
+    chr_bams = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
+      "INPUT=14_reduced_bam/by_chr/#{sample_name}-#{chr}.bam"
+    end
+    if @default_config[:opts][:reduce_reads]
+      ERB.new(<<-EOF
+      # Make a reduce reads BAM for variant calling better/faster/stronger
+      mkdir 14_reduced_bam
+      unset JAVA_MEM_OPTS
+      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=4G,h_vmem=6G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> 13_final_bam/<%= sample_name %>.bam
+
+      if [ "$?" -ne "0" ]; then
+       echo -e "Failure reducing reads"
+       exit 1
+      fi
+
+      export JAVA_MEM_OPTS="-Xmx20G"
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=32G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPESSION_LEVEL=9 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+
+      if [ "$?" -ne "0" ]; then
+       echo -e "Failure joining reduced reads"
+       exit 1
+      fi
+      rm -rf 14_reduced_bam/by_chr
+
+      EOF
+      ).result(binding)
+    else
+      return ""
+    end
+  end
   
   def known_indels_opts()
     if @default_config[:known_indels]
@@ -439,10 +471,10 @@ fi
 
   def covariate_recalibration(sample_name,data)
     ERB.new(<<-EOF
-    # HERE
     # BaseRecalibrator
     mkdir 08_uncalibated_covariates
-    qsub -pe threaded 8 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 9
+    unset JAVA_MEM_OPTS
+    qsub -pe threaded 7 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -450,7 +482,8 @@ fi
     fi
 
     mkdir 10_recalibrated_bam
-    qsub -pe threaded 3 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 9 -nct 4
+    unset JAVA_MEM_OPTS
+    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 9 -nct 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
@@ -458,16 +491,9 @@ fi
     fi
 
     mkdir 13_final_bam
-    #qsub -l h_vmem=24G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_sort_recalibrated samtools sort -m 4000000000 ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>
-
-    #if [ "$?" -ne "0" ]; then
-      #echo -e "Failure sorting recalibrated"
-      #exit 1
-    #fi
 
     mv ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>.bam
-    mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bam.bai
-    #qsub -l h_vmem=8G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_final_bam_index samtools index ./13_final_bam/<%= sample_name %>.bam ./13_final_bam/<%= sample_name %>.bam.bai
+    mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bai
   EOF
     ).result(binding)
   end
@@ -517,7 +543,7 @@ class AnalysisTemplaterApp
 
   # Do the work of running this app
   def run_real
-    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false, :skip_dupes =>false, :skip_vcf => false, :skip_indel_realign => false}}]).first
+    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false, :skip_dupes =>false, :skip_vcf => false, :skip_indel_realign => false, :reduce_reads=>false}}]).first
 
     statii = @options.samples.map do |sample_name|
       process_sample(sample_name)
@@ -810,19 +836,20 @@ fi #if 05_dup_marked/cleaned.bam already existed
 # fastqc info
 qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
+<%= reduce_reads(@sample_name,@data) %>
+
 <%= variant_call(@sample_name,@data) %>
 
 # Clean up after ourselves
 rm -rf 00_inputs \
 01_bwa_aln_sai \
-02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_first_bam" %> \
-04_merged_bam \
+02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
 05_dup_marked \
 06_intervals \
 07_realigned_bam \
 08_uncalibated_covariates \
 10_recalibrated_bam \
-11_calibated_covariates
+11_calibated_covariates 
 
 
 <%=
