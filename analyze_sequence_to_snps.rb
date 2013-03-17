@@ -404,7 +404,7 @@ EOF
     ERB.new(<<-EOF
       # Calculate intervals for realignment
       mkdir 06_intervals
-      qsub -pe threaded 12 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=8G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nct 12
+      qsub -pe threaded 12 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=1G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 12
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with target realigment creation"
