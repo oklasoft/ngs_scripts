@@ -596,6 +596,7 @@ class AnalysisTemplaterApp
     # We sleep a random amount to avoid overloading SGE with a billion jobs right away
     sleep(rand(@options.delay))
     cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -m e -N a_#{sample_name}_full ./analyze.sh"
+    cmd = "./analyze.sh" if @options.run_local
     @stdout.puts(cmd)
     system(cmd)
     status = $?.exitstatus
@@ -611,6 +612,7 @@ class AnalysisTemplaterApp
       o.on('-h','--help') { output_help($stdout); exit(0) }
       o.on('-V', '--verbose')    { @options.verbose = true }
       o.on('-D', '--debug')    { @options.debug = true }
+      o.on('-l', '--local')    { @options.run_local = true }
 
       o.on("-d","--delay", "=REQUIRED") do |amount|
         @options.delay = amount.to_i
@@ -709,6 +711,7 @@ class AnalysisTemplaterApp
   -d, --delay INT        Delay a random between 0 & INT before submitting job. Default 30 seonds
   -c, --config FILE      Specify the configuration yaml file of options for analysis
   -o, --output DIR       Specify the output directory prefix, all results will be saved under this directory
+  -l, --local            Run the analyze script locally, not with initial SGE submit
     EOF
   end
 
