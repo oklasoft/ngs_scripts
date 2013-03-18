@@ -6,6 +6,9 @@ ref = ARGV.shift
 output_base = ARGV.shift
 output_prefix = ARGV.shift
 input_bam = ARGV.shift
+do_all = ARGV.shift
+
+do_all = do_all && 'all' == do_all
 
 unless output_base && output_prefix && input_bam && ref
   raise "Missing some option <ref> <output_base_dir> <output_bam_prefix> <input_bam_file>"
@@ -15,7 +18,7 @@ Dir.chdir(output_base)
 
 cmd = %w/gatk -T ReduceReads -R/ + [ref,"-I",input_bam]
 
-if ENV['SGE_TASK_ID']
+unless do_all
   # we will do it by chr
   begin
     Dir.mkdir('by_chr')
