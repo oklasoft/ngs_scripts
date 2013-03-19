@@ -354,7 +354,7 @@ EOF
       # Make a reduce reads BAM for variant calling better/faster/stronger
       mkdir 14_reduced_bam
       unset JAVA_MEM_OPTS
-      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=4G,h_vmem=6G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ../13_final_bam/<%= sample_name %>.bam
+      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=4G,h_vmem=6G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure reducing reads"
