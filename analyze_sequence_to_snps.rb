@@ -368,6 +368,7 @@ EOF
        echo -e "Failure joining reduced reads"
        exit 1
       fi
+      mv 14_reduced_bam/<%= sample_name %>.bai 14_reduced_bam/<%= sample_name %>.bam.bai
       rm -rf 14_reduced_bam/by_chr
 
       EOF
