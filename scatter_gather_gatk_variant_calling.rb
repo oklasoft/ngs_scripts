@@ -241,7 +241,7 @@ Dir.chdir(@options.output_base) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
     
     threaded_queue = if @options.threads > 1
-      "-pe threaded 2"
+      "-pe threaded #{@options.threads-1}"
     else
       ""
     end
@@ -297,7 +297,7 @@ Dir.chdir(@options.output_base) do
       end
 
       cmd = "qsub -q ngs.q #{threaded_queue} -p -150 -m e -o logs -b y -V -j y -cwd \
-      -N #{name_base}_variants_#{slice} -l mem_free=4G,virtual_free=4G,h_vmem=6G \
+      -N #{name_base}_variants_#{slice} -l mem_free=#{(4.0/@options.threads).ceil}G,virtual_free=#{(4.0/@options.threads).ceil}G,h_vmem=6G \
 gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
@@ -307,7 +307,7 @@ gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
 -L #{input_file}"
       puts cmd
       system cmd
-      sleep(1)
+      sleep(2)
 
       to_joins << "-V #{output_file}"
     end #each slice
