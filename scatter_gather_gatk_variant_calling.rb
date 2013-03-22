@@ -241,10 +241,15 @@ Dir.chdir(@options.output_base) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
     
     threaded_queue = if @options.threads > 1
-      "-pe threaded #{@options.threads}"
+      "-pe threaded 2"
     else
       ""
     end
+    nct_opt = if @options.threads > 1
+                " -nct #{@options.threads}"
+              else
+                ""
+              end
     
     sliced_intervals().each_with_index do |sliced_intervals,slice|
       slice = slice.to_s.rjust(@options.scatter_limit.to_s.length,"0")
@@ -252,12 +257,21 @@ Dir.chdir(@options.output_base) do
       STDERR.puts "#{slice}\t#{sliced_intervals.join("; ")}" if @options.verbose
 
       sliced_interval_file = "sliced_interval_#{slice}.interval_list"
+      final_intervals = []
+      final_intervals << sliced_intervals.shift
+      sliced_intervals.each do |sl|
+        if final_intervals[-1].chr == sl.chr && final_intervals[-1].start + 1 == sl.start
+          final_intervals[-1].stop = sl.stop
+        else
+          final_intervals << sl
+        end
+      end
       File.open(sliced_interval_file,"w") do |f|
-        if BedInterval == sliced_intervals.first.class
-          f.puts sliced_intervals.join("\n")
-        elsif PicardInterval == sliced_intervals.first.class
-          f.puts sliced_intervals.first.headers.join("\n")
-          f.puts sliced_intervals.join("\n")
+        if BedInterval == final_intervals.first.class
+          f.puts final_intervals.join("\n")
+        elsif PicardInterval == final_intervals.first.class
+          f.puts final_intervals.first.headers.join("\n")
+          f.puts final_intervals.join("\n")
         end
       end
 
@@ -282,9 +296,9 @@ Dir.chdir(@options.output_base) do
         glm = "-glm BOTH"
       end
 
-      cmd = "qsub -q ngs.q #{threaded_queue} -p -50 -m e -o logs -b y -V -j y -cwd \
+      cmd = "qsub -q ngs.q #{threaded_queue} -p -150 -m e -o logs -b y -V -j y -cwd \
       -N #{name_base}_variants_#{slice} -l mem_free=4G,virtual_free=4G,h_vmem=6G \
-gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
+gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
 -R #{@options.reference_path} #{snp_opt} \
 -I #{@options.bam_list} \
 -o #{output_file} \
@@ -301,7 +315,7 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
   
   slices_of_to_joins = to_joins.each_slice(100000/to_joins.first.length).to_a
   if 1 == slices_of_to_joins.size
-    cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q all.q -N #{name_base}_variants_merge \\
+    cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{name_base}_variants_merge \\
   -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
   -genotypeMergeOptions UNSORTED \\
   -R #{@options.reference_path} \\
@@ -313,14 +327,14 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/2.4-3-g2a7af43"
+      f.puts "module load gatk/2.4-9-g532efad"
       f.puts cmd
     end
   else
     alphabet = ("aa".."zz").to_a
     intermediate_vcfs_to_merge = []
     slices_of_to_joins.each_with_index do |slice_of_to_joins,index|
-      cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q all.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
+      cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
       -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
       -genotypeMergeOptions UNSORTED \\
       -R #{@options.reference_path} \\
@@ -334,12 +348,12 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
         f.puts "#!/usr/bin/env bash"
         f.puts "source /etc/profile.d/*.sh"
         f.puts "module load sge"
-        f.puts "module load gatk/2.4-3-g2a7af43"
+        f.puts "module load gatk/2.4-9-g532efad"
         f.puts cmd
       end      
     end
     
-    cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q all.q -N final_#{name_base}_variants_merge \\
+    cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N final_#{name_base}_variants_merge \\
     -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
     -genotypeMergeOptions UNSORTED \\
     -R #{@options.reference_path} \\
@@ -351,7 +365,7 @@ gatk -T #{@options.caller} #{glm} -nct #{@options.threads} #{annotations} \
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/2.4-3-g2a7af43"
+      f.puts "module load gatk/2.4-9-g532efad"
       f.puts cmd
     end      
     
