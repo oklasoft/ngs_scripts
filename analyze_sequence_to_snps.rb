@@ -362,7 +362,7 @@ EOF
       fi
 
       export JAVA_MEM_OPTS="-Xmx20G"
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=32G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPESSION_LEVEL=9 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=32G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=9 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure joining reduced reads"
