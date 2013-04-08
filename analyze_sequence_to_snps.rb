@@ -214,7 +214,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -l h_vmem=16G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
+    cmd = "qsub -l virtual_free=4,h_vmem=24G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -244,7 +244,7 @@ class AnalysisTemplate < Template
   end
 
   def create_original_sam_inputs(sample_name,data)
-    cmd = "qsub -l h_vmem=40G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_convert_to_sam convert_fastq_to_bam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
+    cmd = "qsub -l virtual_free=10G,h_vmem=50G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_convert_to_sam convert_fastq_to_bam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -364,7 +364,7 @@ EOF
       fi
 
       export JAVA_MEM_OPTS="-Xmx20G"
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=32G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=9 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=48G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=9 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure joining reduced reads"
@@ -407,7 +407,7 @@ EOF
     ERB.new(<<-EOF
       # Calculate intervals for realignment
       mkdir 06_intervals
-      qsub -pe threaded 12 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=1G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 12
+      qsub -pe threaded 10 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l mem_free=1G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with target realigment creation"
@@ -430,7 +430,7 @@ EOF
   def mark_dupes_or_skip(sample_name,data)
     if @default_config[:opts][:skip_dupes]
       <<-EOF
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=./tmp #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True USE_THREADING=True
+qsub -l virtual_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=./tmp #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True USE_THREADING=True
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with merging the sams"
   exit 1
@@ -443,7 +443,7 @@ fi
   
   def mark_dupes(sample_name,data)
     <<-EOF
-qsub -l h_vmem=40G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=./tmp #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
+qsub -l virtual_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=./tmp #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -537,7 +537,7 @@ class AnalysisTemplaterApp
     if !options_parsed?() || !options_valid?()
       @stderr.puts("")
       output_usage(@stderr)
-      return 0
+      return 1
     end
     return run_real()
   end #run
@@ -762,7 +762,7 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 
 # fastqc info
 mkdir qc
-qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
+qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
 mkdir 00_inputs
@@ -778,7 +778,7 @@ fi
 
 # Prep all those reads for alignment with bwa aln
 mkdir 01_bwa_aln_sai
-qsub -l h_vmem=8G -pe threaded 12 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_bam_inputs() %>
+qsub -l virtual_free=2G,h_vmem=16G -pe threaded 6 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_bam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
@@ -800,18 +800,22 @@ fi
 # Going forward let us play with BAM files
 # We will sort the individual aligned SAM files so we can merge, sort, & mark dupes in one action
 mkdir 03_sorted_bams
-qsub -l h_vmem=30G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_sams sort_sam_qsub_tasked.rb 03_sorted_bams <%= input_sam_bam_files("02_bwa_alignment","sam") %>
+qsub -l virtual_free=4G,h_vmem=56G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_sams sort_sam_qsub_tasked.rb 03_sorted_bams <%= input_sam_bam_files("02_bwa_alignment","sam") %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure sorting aligned sams"
   exit 1
 fi
 
+rm -rf 00_inputs 01_bwa_aln_sai 02_bwa_alignment
+
 
 # Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
 # While we do that we shall also sort it, mark possible duplicates & make an index
 mkdir 05_dup_marked
 <%= mark_dupes_or_skip(@sample_name,@data) %>$
+
+<%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %> 
 
 
 # TODO stop here if pre_gatk only
@@ -840,7 +844,7 @@ fi #if 05_dup_marked/cleaned.bam already existed
 <%= covariate_or_final(@sample_name,@data) %>
 
 # fastqc info
-qsub -l h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
+qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
 <%= reduce_reads(@sample_name,@data) %>
 
