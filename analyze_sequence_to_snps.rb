@@ -364,7 +364,7 @@ EOF
       fi
 
       export JAVA_MEM_OPTS="-Xmx20G"
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=48G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=9 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=48G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure joining reduced reads"
@@ -402,7 +402,7 @@ EOF
     compression = if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
                     ""
                   else
-                    "--bam_compression 9"
+                    "--bam_compression 7"
                   end
     ERB.new(<<-EOF
       # Calculate intervals for realignment
@@ -486,7 +486,7 @@ fi
 
     mkdir 10_recalibrated_bam
     unset JAVA_MEM_OPTS
-    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 9 -nct 8
+    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 7 -nct 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"

@@ -11,7 +11,7 @@ unless output_base && output_prefix && input_bam && ref
   raise "Missing some option <ref> <output_base_dir> <output_bam_prefix> <input_bam_file>"
 end
 
-cmd = %w/gatk -T PrintReads -R/ + [ref,"-I",input_bam]
+cmd = %w/gatk -T PrintReads --bam_compression 7 -R/ + [ref,"-I",input_bam]
 
 index = (ENV['SGE_TASK_ID']).to_i - 1
 chr = HUMAN_CHRS[index]
