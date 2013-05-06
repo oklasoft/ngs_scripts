@@ -101,7 +101,7 @@ module load samtools/0.1.18
 module unload picard
 module load picard/1.86
 module unload gatk
-module load gatk/2.4-9-g532efad
+module load gatk/2.5-2-gf57256b
 module unload fastqc
 module load fastqc/0.9.4
 module unload tabix
@@ -515,8 +515,8 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "2.2.0"
-  REVISION_DATE = "20130324"
+  VERSION       = "2.2.1"
+  REVISION_DATE = "20130506"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012-2013 Oklahoma Medical Research Foundation"
 
