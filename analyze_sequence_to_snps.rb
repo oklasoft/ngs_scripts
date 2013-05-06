@@ -355,8 +355,8 @@ EOF
       ERB.new(<<-EOF
       # Make a reduce reads BAM for variant calling better/faster/stronger
       mkdir 14_reduced_bam
-      unset JAVA_MEM_OPTS
-      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=4G,h_vmem=6G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
+      export JAVA_MEM_OPTS="-Xmx12G"
+      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=8G,h_vmem=15G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure reducing reads"
@@ -778,7 +778,7 @@ fi
 
 # Prep all those reads for alignment with bwa aln
 mkdir 01_bwa_aln_sai
-qsub -l virtual_free=2G,h_vmem=16G -pe threaded 6 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_bam_inputs() %>
+qsub -l virtual_free=1G,h_vmem=16G -pe threaded 10 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_bam_inputs() %>
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa sai"
