@@ -214,7 +214,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -l virtual_free=4,h_vmem=24G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
+    cmd = "qsub -l virtual_free=4G,h_vmem=24G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -813,7 +813,7 @@ rm -rf 00_inputs 01_bwa_aln_sai 02_bwa_alignment
 # Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
 # While we do that we shall also sort it, mark possible duplicates & make an index
 mkdir 05_dup_marked
-<%= mark_dupes_or_skip(@sample_name,@data) %>$
+<%= mark_dupes_or_skip(@sample_name,@data) %>
 
 <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %> 
 
