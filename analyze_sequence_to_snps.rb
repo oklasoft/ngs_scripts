@@ -515,8 +515,8 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "2.2.1"
-  REVISION_DATE = "20130506"
+  VERSION       = "2.3.0"
+  REVISION_DATE = "20130602"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012-2013 Oklahoma Medical Research Foundation"
 
