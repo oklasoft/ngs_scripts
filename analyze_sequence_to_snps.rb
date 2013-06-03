@@ -95,7 +95,7 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 # be sure to start with a fresh & known enviroment (hopefully)
 source /etc/profile.d/*.sh
 module unload bwa
-module load bwa/0.6.2
+module load bwa/0.7.4
 module unload samtools
 module load samtools/0.1.18
 module unload picard
@@ -214,7 +214,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -l virtual_free=4G,h_vmem=24G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_sampese_qsub_tasked.rb 02_bwa_alignment #{bwa_reference_for_data(data)}"
+    cmd = "qsub -pe threaded 10 -l virtual_free=800M,h_vmem=32G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -226,14 +226,14 @@ class AnalysisTemplate < Template
       cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
 
       # 01_bwa_aln_sai file(s)
-      lane_shell_vars.each do |v|
-        # cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
-        cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
-      end
+      #lane_shell_vars.each do |v|
+        ## cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
+        #cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
+      #end
       # fastq file(s)
       lane_shell_vars.each do |v|
-        # cmd += " ${#{v}}"
-        cmd += " 00_inputs/#{index}.bam"
+        cmd += " ${#{v}}"
+        #cmd += " 00_inputs/#{index}.bam"
       end
     end
     return cmd
@@ -496,7 +496,7 @@ fi
     mkdir 13_final_bam
 
     mv ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>.bam
-    mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bai
+    mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bam.bai
   EOF
     ).result(binding)
   end
@@ -765,28 +765,11 @@ mkdir qc
 qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
-mkdir 00_inputs
+#mkdir 00_inputs
 export JAVA_MEM_OPTS="-Xmx16G"
-<%=
-  create_original_sam_inputs(@sample_name,@data)
-%>
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure converting fastq to bam"
-  exit 1
-fi
-
-# Prep all those reads for alignment with bwa aln
-mkdir 01_bwa_aln_sai
-qsub -l virtual_free=1G,h_vmem=16G -pe threaded 10 -o logs -sync y -t 1-<%= total_number_input_sequence_files() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_bwa_aln bwa_aln_qsub_tasked.rb 01_bwa_aln_sai <%= bwa_reference_for_data(@data) %> <%= ordered_bam_inputs() %>
-
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure with bwa sai"
-  exit 1
-fi
 
 # Now take those & actually generate the alignment SAM output, paired or single
-mkdir 02_bwa_alignment
+mkdir 03_sorted_bams
 <%=
   bwa_alignment_command(@sample_name,@data)
 %>
@@ -799,13 +782,13 @@ fi
 
 # Going forward let us play with BAM files
 # We will sort the individual aligned SAM files so we can merge, sort, & mark dupes in one action
-mkdir 03_sorted_bams
-qsub -l virtual_free=4G,h_vmem=56G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_sams sort_sam_qsub_tasked.rb 03_sorted_bams <%= input_sam_bam_files("02_bwa_alignment","sam") %>
+#mkdir 03_sorted_bams
+#qsub -l virtual_free=4G,h_vmem=56G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_sams sort_sam_qsub_tasked.rb 03_sorted_bams <%= input_sam_bam_files("02_bwa_alignment","sam") %>
 
-if [ "$?" -ne "0" ]; then
-  echo -e "Failure sorting aligned sams"
-  exit 1
-fi
+#if [ "$?" -ne "0" ]; then
+  #echo -e "Failure sorting aligned sams"
+  #exit 1
+#fi
 
 rm -rf 00_inputs 01_bwa_aln_sai 02_bwa_alignment
 
