@@ -95,7 +95,7 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 # be sure to start with a fresh & known enviroment (hopefully)
 source /etc/profile.d/*.sh
 module unload bwa
-module load bwa/0.7.4
+module load pass
 module unload samtools
 module load samtools/0.1.18
 module unload picard
@@ -201,7 +201,6 @@ class AnalysisTemplate < Template
   end
 
   def link_fastq_inputs()
-    #ln -s ${FASTQ1} 00_inputs/A_1.fastq
     lines = []
     @fastq_shell_vars.each do |var,data|
       lines << "ln -s ${#{var}} 00_inputs/#{data[:letter]}_#{data[:paired]}.fastq"
@@ -214,7 +213,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -pe threaded 10 -l virtual_free=800M,h_vmem=32G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
+    cmd = "qsub -pe threaded 10 -l virtual_free=800M,h_vmem=32G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_pass_alignment pass_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -223,17 +222,11 @@ class AnalysisTemplate < Template
       end
 
       # rg
-      cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
+      cmd += " '\"LB:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\tSM:#{sample_name}\tPL:Solid\tPU:#{data[index][:lane]}\"'"
 
-      # 01_bwa_aln_sai file(s)
-      #lane_shell_vars.each do |v|
-        ## cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
-        #cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
-      #end
       # fastq file(s)
       lane_shell_vars.each do |v|
         cmd += " ${#{v}}"
-        #cmd += " 00_inputs/#{index}.bam"
       end
     end
     return cmd
@@ -356,7 +349,7 @@ EOF
       # Make a reduce reads BAM for variant calling better/faster/stronger
       mkdir 14_reduced_bam
       export JAVA_MEM_OPTS="-Xmx12G"
-      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=8G,h_vmem=15G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
+      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=12G,h_vmem=15G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure reducing reads"
@@ -477,7 +470,7 @@ fi
     # BaseRecalibrator
     mkdir 08_uncalibated_covariates
     unset JAVA_MEM_OPTS
-    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 8
+    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 8 --solid_nocall_strategy PURGE_READ
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -762,7 +755,7 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 
 # fastqc info
 mkdir qc
-qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
+#qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
 #mkdir 00_inputs
@@ -790,15 +783,12 @@ fi
   #exit 1
 #fi
 
-rm -rf 00_inputs 01_bwa_aln_sai 02_bwa_alignment
 
 
 # Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
 # While we do that we shall also sort it, mark possible duplicates & make an index
 mkdir 05_dup_marked
 <%= mark_dupes_or_skip(@sample_name,@data) %>
-
-<%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %> 
 
 
 # TODO stop here if pre_gatk only
