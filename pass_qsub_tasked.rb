@@ -37,7 +37,7 @@ end
 
 output = File.join(output_base,"#{index}.bam")
 
-cmd = "pass -p 11111100111111 -b -cpu #{threads} -flc 1 -fid 90 -sam -csfasta #{data[:inputs].map{|x| "#{x}_F3.csfasta"}.join(" ")} -qual #{data[:inputs].map{|x| "#{x}_F3_QV.qual"}.join(" ")} -d #{reference} -seeds_step 3 "
+cmd = "pass -g 10 -p 11111100111111 -b -cpu #{threads} -flc 1 -fid 90 -sam -csfasta #{data[:inputs].map{|x| "#{x}_F3.csfasta"}.join(" ")} -qual #{data[:inputs].map{|x| "#{x}_F3_QV.qual"}.join(" ")} -d #{reference} -seeds_step 3 "
 cmd += "| picard AddOrReplaceReadGroups TMP_DIR=./tmp VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 OUTPUT=#{output} SORT_ORDER=coordinate INPUT=/dev/stdin #{rg_opts.join(" ")}"
 
 puts cmd
