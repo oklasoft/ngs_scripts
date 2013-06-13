@@ -37,7 +37,7 @@ end
 
 output = File.join(output_base,"#{index}.bam")
 
-cmd = "novoalignCS -f #{data[:inputs].map{|x| "#{x}_F3.csfasta"}.join(" ")} -d #{reference} -o SAM -g 20 -x 12 -o FullNW -r E 10 -e 1 -t 1000"
+cmd = "novoalignCS -f #{data[:inputs].map{|x| "#{x}_F3.csfasta"}.join(" ")} -d #{reference} -o SAM -t 150 -e 10 -r All -o FullNW -g 20"
 cmd += "| picard AddOrReplaceReadGroups TMP_DIR=./tmp VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 OUTPUT=#{output} SORT_ORDER=coordinate INPUT=/dev/stdin #{rg_opts.join(" ")}"
 
 puts cmd
