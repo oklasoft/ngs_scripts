@@ -95,7 +95,7 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 # be sure to start with a fresh & known enviroment (hopefully)
 source /etc/profile.d/*.sh
 module unload bwa
-module load pass
+module load novoaligncs
 module unload samtools
 module load samtools/0.1.18
 module unload picard
@@ -213,7 +213,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -pe threaded 10 -l virtual_free=1G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_pass_alignment pass_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
+    cmd = "qsub -l virtual_free=8G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_novo_alignment novoaligncs_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -410,7 +410,7 @@ EOF
       # Now realign & fix any mate info
       mkdir 07_realigned_bam
       unset JAVA_MEM_OPTS
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression} -filterNoBases
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with indel realigmnent"
