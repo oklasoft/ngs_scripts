@@ -213,7 +213,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -l virtual_free=8G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_novo_alignment novoaligncs_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
+    cmd = "qsub -pe threaded 10 -l virtual_free=1G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_novo_alignment novoaligncs_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
