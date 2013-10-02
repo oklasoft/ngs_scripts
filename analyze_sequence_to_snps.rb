@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby1.9.3
 #
 # analyze_sequence_to_snps.rb
 # Created by Stuart Glenn on 2010-12-22
@@ -95,17 +95,17 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 # be sure to start with a fresh & known enviroment (hopefully)
 source /etc/profile.d/*.sh
 module unload bwa
-module load bwa/0.7.4
+module load bwa/0.7.5a
 module unload samtools
-module load samtools/0.1.18
+module load samtools/0.1.19
 module unload picard
-module load picard/1.86
+module load picard/1.99
 module unload gatk
-module load gatk/2.5-2-gf57256b
+module load gatk/2.7-2-g6bda569
 module unload fastqc
-module load fastqc/0.9.4
+module load fastqc/0.10.1
 module unload tabix
-module load tabix/0.2.3
+module load tabix/0.2.6
 module unload btangs
 module load btangs/1.6.0
     EOS
