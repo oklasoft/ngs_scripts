@@ -85,16 +85,13 @@ a high priority for me.
 
   Performs the GATK Variant Quality Score Recalibration workflow on a VCF
   
-* **add_read_group_to_sam.pl**
+* **xcnv_to_plink_project.rb**
 
-  PERL script found online at [seqanswers.com](http://seqanswers.com/forums/showthread.php?t=4180) to force the RG tag, as version of BWA currently used does not add it for unaligned reads
+  Quick script to ready a plink cnv style project from xhmm xcnv output & a pedigree template
 
 # License
 
-Unless otherwise noted, everything is Copyright (c) 2011 Stuart Glenn, Oklahoma Medical
+Unless otherwise noted, everything is Copyright (c) 2011-2014 Stuart Glenn, Oklahoma Medical
 Research Foundation. (OMRF). Essentially under the BSD license, see LICENSE file for
 full details. 
 
-add_read_group_to_sam.pl is excluded from that copyright & license, as it just
-included here for connivence & assumed to be
-publicish domain due to open sharing on the forums
