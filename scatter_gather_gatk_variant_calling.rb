@@ -124,7 +124,7 @@ def sliced_intervals()
 end
 
 def output_version(out)
-  out.puts "#{File.basename($0)} 1.0"
+  out.puts "#{File.basename($0)} 2.3.1"
 end
 
 def output_help(out)
