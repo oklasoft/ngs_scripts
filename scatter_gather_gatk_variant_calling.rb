@@ -241,14 +241,14 @@ Dir.chdir(@options.output_base) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
     
     threaded_queue = if @options.threads > 1
-      "-pe threaded #{@options.threads-1}"
+      %W(-pe threaded #{@options.threads-1})
     else
-      ""
+      []
     end
     nct_opt = if @options.threads > 1
-                " -nct #{@options.threads}"
+                %W(-nct #{@options.threads})
               else
-                ""
+                []
               end
     
     sliced_intervals().each_with_index do |sliced_intervals,slice|
@@ -280,33 +280,33 @@ Dir.chdir(@options.output_base) do
       
       snp_opt = case @options.snp_path 
         when nil
-          ""
+          []
         when /\.rod$/
-          "-D #{@options.snp_path}"
+          %W(-D #{@options.snp_path})
         when /\.vcf(\.gz)?$/
-          "-D #{@options.snp_path} "
+          %W(-D #{@options.snp_path})
         else
-          ""
+          []
       end
 
-      annotations = ""
-      glm = ""
+      annotations = []
+      glm = []
       if "UnifiedGenotyper" == @options.caller
-        annotations = "-A AlleleBalance "
-        glm = "-glm BOTH"
+        annotations = %w(-A AlleleBalance)
+        glm = %w(-glm BOTH)
       end
 
-      cmd = "qsub -q ngs.q #{threaded_queue} -p -150 -m e -o logs -b y -V -j y -cwd \
-      -N #{name_base}_variants_#{slice} -l mem_free=#{(4.0/@options.threads).ceil}G,virtual_free=#{(4.0/@options.threads).ceil}G,h_vmem=6G \
-gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
--R #{@options.reference_path} #{snp_opt} \
--I #{@options.bam_list} \
--o #{output_file} \
--stand_call_conf #{@options.stand_call_conf} \
--stand_emit_conf #{@options.stand_emit_conf} \
--L #{input_file}"
-      puts cmd
-      system cmd
+      cmd = %W(qsub -q ngs.q) + threaded_queue + %W(-p -150 -m e -o logs -b y -V -j y -cwd 
+-N #{name_base}_variants_#{slice} -l mem_free=#{(4.0/@options.threads).ceil}G,virtual_free=#{(4.0/@options.threads).ceil}G,h_vmem=6G 
+gatk -T #{@options.caller}) + glm + nct_opt + annotations +
+%W(-R #{@options.reference_path}) + snp_opt +
+%W(-I #{@options.bam_list} 
+-o #{output_file} 
+-stand_call_conf #{@options.stand_call_conf} 
+-stand_emit_conf #{@options.stand_emit_conf} 
+-L #{input_file}).flatten
+      puts cmd.join(" ")
+      system(*cmd)
       sleep(2)
 
       to_joins << "-V #{output_file}"
@@ -315,9 +315,11 @@ gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
   
   slices_of_to_joins = to_joins.each_slice(100000/to_joins.first.length).to_a
   if 1 == slices_of_to_joins.size
-    cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{name_base}_variants_merge \\
+    cmd = "qsub -pe threaded 4 -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{name_base}_variants_merge \\
   -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
   -genotypeMergeOptions UNSORTED \\
+  --assumeIdenticalSamples \\
+  -nt 4 \\
   -R #{@options.reference_path} \\
   -o #{name_base}_variants.vcf"
     cmd += " \\
@@ -334,9 +336,11 @@ gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
     alphabet = ("aa".."zz").to_a
     intermediate_vcfs_to_merge = []
     slices_of_to_joins.each_with_index do |slice_of_to_joins,index|
-      cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
+      cmd = "qsub -pe threaded 4 -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
       -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
       -genotypeMergeOptions UNSORTED \\
+      --assumeIdenticalSamples \\
+      -nt 4 \\
       -R #{@options.reference_path} \\
       -o #{alphabet[index]}_#{name_base}_variants.vcf"
       cmd += " \\
@@ -353,9 +357,11 @@ gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
       end      
     end
     
-    cmd = "qsub -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N final_#{name_base}_variants_merge \\
+    cmd = "qsub -pe threaded 4 -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N final_#{name_base}_variants_merge \\
     -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
     -genotypeMergeOptions UNSORTED \\
+    --assumeIdenticalSamples \\
+    -nt 4 \\
     -R #{@options.reference_path} \\
     -o #{name_base}_variants.vcf"
     cmd += " \\
@@ -367,7 +373,7 @@ gatk -T #{@options.caller} #{glm} #{nct_opt} #{annotations} \
       f.puts "module load sge"
       f.puts "module load gatk/2.7-2-g6bda569"
       f.puts cmd
-    end      
+    end
     
     
   end
