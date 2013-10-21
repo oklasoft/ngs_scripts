@@ -598,10 +598,10 @@ class AnalysisTemplaterApp
 
     # We sleep a random amount to avoid overloading SGE with a billion jobs right away
     sleep(rand(@options.delay))
-    cmd = "qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -m e -N a_#{sample_name}_full ./analyze.sh"
-    cmd = "./analyze.sh" if @options.run_local
-    @stdout.puts(cmd)
-    system(cmd)
+    cmd = %W(qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -m e -N a_#{sample_name}_full ./analyze.sh)
+    cmd = %w(./analyze.sh) if @options.run_local
+    @stdout.puts(cmd.join(" "))
+    system(*cmd)
     status = $?.exitstatus
 
     Dir.chdir(return_dir)
