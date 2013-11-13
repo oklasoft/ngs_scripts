@@ -355,16 +355,16 @@ EOF
       ERB.new(<<-EOF
       # Make a reduce reads BAM for variant calling better/faster/stronger
       mkdir 14_reduced_bam
-      export JAVA_MEM_OPTS="-Xmx12G"
-      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=8G,h_vmem=15G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
+      export JAVA_MEM_OPTS="-Xmx16G"
+      qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l mem_free=10G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure reducing reads"
        exit 1
       fi
 
-      export JAVA_MEM_OPTS="-Xmx20G"
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=12G,h_vmem=48G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+      export JAVA_MEM_OPTS="-Xmx24G"
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure joining reduced reads"
@@ -762,7 +762,7 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 
 # fastqc info
 mkdir qc
-qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
+qsub -p -200 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
 #mkdir 00_inputs
@@ -827,7 +827,7 @@ fi #if 05_dup_marked/cleaned.bam already existed
 <%= covariate_or_final(@sample_name,@data) %>
 
 # fastqc info
-qsub -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
+qsub -p -200  -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
 <%= reduce_reads(@sample_name,@data) %>
 
