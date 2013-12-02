@@ -93,7 +93,7 @@ class Template
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # be sure to start with a fresh & known enviroment (hopefully)
-source /etc/profile.d/*.sh
+source /etc/profile.d/profile-modules.sh
 module unload bwa
 module load bwa/0.7.5a
 module unload samtools
@@ -333,7 +333,7 @@ EOF
       ERB.new(<<-EOF
       # Finally call individuals indels & snps
 
-      qsub -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants -l mem_free=4G,h_vmem=6G gatk -T UnifiedGenotyper -A AlleleBalance -l INFO -nct 3 -R ${GATK_REF} -glm BOTH -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+      qsub -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants -l mem_free=4G,h_vmem=8G gatk -T UnifiedGenotyper -A AlleleBalance -l INFO -nct 3 -R ${GATK_REF} -glm BOTH -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
 
       if [ "$?" -ne "0" ]; then
        echo -e Failure
@@ -417,7 +417,7 @@ EOF
       # Now realign & fix any mate info
       mkdir 07_realigned_bam
       unset JAVA_MEM_OPTS
-      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=6G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
+      qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l mem_free=4G,h_vmem=8G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure with indel realigmnent"
@@ -477,7 +477,7 @@ fi
     # BaseRecalibrator
     mkdir 08_uncalibated_covariates
     unset JAVA_MEM_OPTS
-    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=6G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 8
+    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l mem_free=4G,h_vmem=8G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure counting covariates"
@@ -486,7 +486,7 @@ fi
 
     mkdir 10_recalibrated_bam
     unset JAVA_MEM_OPTS
-    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=6G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 7 -nct 8
+    qsub -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l mem_free=4G,h_vmem=8G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 7 -nct 8
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reclibrating bam"
