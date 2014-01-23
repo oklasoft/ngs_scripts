@@ -240,8 +240,11 @@ Dir.chdir(@options.output_base) do
   Dir.chdir(work_dir) do
     raise "Can't make log dir" unless Dir.mkdir("logs")
     
+    slots = 1
     threaded_queue = if @options.threads > 1
-      %W(-pe threaded #{@options.threads-1})
+                       slots = @options.threads - 2
+                       slots = 1 if slots <= 1
+      %W(-pe threaded #{slots})
     else
       []
     end
@@ -297,7 +300,7 @@ Dir.chdir(@options.output_base) do
       end
 
       cmd = %W(qsub -q ngs.q) + threaded_queue + %W(-p -150 -m e -o logs -b y -V -j y -cwd 
--N #{name_base}_variants_#{slice} -l mem_free=#{(4.0/@options.threads).ceil}G,virtual_free=#{(4.0/@options.threads).ceil}G,h_vmem=6G 
+-N #{name_base}_variants_#{slice} -l mem_free=#{(4.0/slots).ceil}G,virtual_free=#{(8.0/slots).ceil}G,h_vmem=8G 
 gatk -T #{@options.caller}) + glm + nct_opt + annotations +
 %W(-R #{@options.reference_path}) + snp_opt +
 %W(-I #{@options.bam_list} 
