@@ -332,7 +332,7 @@ gatk -T #{@options.caller}) + glm + nct_opt + annotations +
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/2.7-2-g6bda569"
+      f.puts "module load gatk/2.8-1-g932cd3a"
       f.puts cmd
     end
   else
@@ -355,7 +355,7 @@ gatk -T #{@options.caller}) + glm + nct_opt + annotations +
         f.puts "#!/usr/bin/env bash"
         f.puts "source /etc/profile.d/*.sh"
         f.puts "module load sge"
-        f.puts "module load gatk/2.7-2-g6bda569"
+        f.puts "module load gatk/2.8-1-g932cd3a"
         f.puts cmd
       end      
     end
@@ -374,7 +374,7 @@ gatk -T #{@options.caller}) + glm + nct_opt + annotations +
       f.puts "#!/usr/bin/env bash"
       f.puts "source /etc/profile.d/*.sh"
       f.puts "module load sge"
-      f.puts "module load gatk/2.7-2-g6bda569"
+      f.puts "module load gatk/2.8-1-g932cd3a"
       f.puts cmd
     end
     

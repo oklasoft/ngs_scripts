@@ -95,13 +95,13 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 # be sure to start with a fresh & known enviroment (hopefully)
 source /etc/profile.d/profile-modules.sh
 module unload bwa
-module load bwa/0.7.5a
+module load bwa/0.7.6a
 module unload samtools
 module load samtools/0.1.19
 module unload picard
 module load picard/1.99
 module unload gatk
-module load gatk/2.7-2-g6bda569
+module load gatk/2.8-1-g932cd3a
 module unload fastqc
 module load fastqc/0.10.1
 module unload tabix
