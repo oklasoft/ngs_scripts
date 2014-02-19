@@ -293,15 +293,17 @@ Dir.chdir(@options.output_base) do
       end
 
       annotations = []
-      glm = []
+      caller_opts = []
       if "UnifiedGenotyper" == @options.caller
         annotations = %w(-A AlleleBalance)
-        glm = %w(-glm BOTH)
+        caller_opts = %w(-glm BOTH)
+      else
+        caller_opts =%w(--minPruning 3)
       end
 
-      cmd = %W(qsub -q ngs.q) + threaded_queue + %W(-p -150 -m e -o logs -b y -V -j y -cwd 
--N #{name_base}_variants_#{slice} -l mem_free=#{(4.0/slots).ceil}G,virtual_free=#{(8.0/slots).ceil}G,h_vmem=8G 
-gatk -T #{@options.caller}) + glm + nct_opt + annotations +
+      cmd = %W(qsub -q ngs.q) + threaded_queue + %W(-p -550 -m e -o logs -b y -V -j y -cwd
+-N #{name_base}_variants_#{slice} -l h_stack=256M,mem_free=#{(8.0/slots).ceil}G,virtual_free=#{(9.0/slots).ceil}G,h_vmem=12G
+gatk -T #{@options.caller}) + caller_opts + nct_opt + annotations +
 %W(-R #{@options.reference_path}) + snp_opt +
 %W(-I #{@options.bam_list} 
 -o #{output_file} 
