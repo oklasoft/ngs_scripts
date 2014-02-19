@@ -230,7 +230,7 @@ end
 parse_opts(ARGV)
 
 STDERR.puts "#{@options}" if @options.verbose
-name_base = File.split(@options.bam_list)[-1]
+name_base = File.basename(File.split(@options.bam_list)[-1],".list")
 
 Dir.chdir(@options.output_base) do
   puts "Scatter/Gather Variants Starting #{$$}"
