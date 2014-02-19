@@ -761,8 +761,8 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 %>
 
 # fastqc info
-mkdir qc
-qsub -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
+#mkdir qc
+#qsub -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
 #mkdir 00_inputs
@@ -827,7 +827,7 @@ fi #if 05_dup_marked/cleaned.bam already existed
 <%= covariate_or_final(@sample_name,@data) %>
 
 # fastqc info
-qsub -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
+#qsub -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
 <%= reduce_reads(@sample_name,@data) %>
 
