@@ -321,7 +321,7 @@ gatk -T #{@options.caller}) + caller_opts + nct_opt + annotations +
   slices_of_to_joins = to_joins.each_slice(100000/to_joins.first.length).to_a
   if 1 == slices_of_to_joins.size
     cmd = "qsub -pe threaded 4 -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{name_base}_variants_merge \\
-  -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
+  -l mem_free=4G,virtual_free=4G,h_vmem=9G gatk -T CombineVariants \\
   -genotypeMergeOptions UNSORTED \\
   --assumeIdenticalSamples \\
   -nt 4 \\
@@ -342,7 +342,7 @@ gatk -T #{@options.caller}) + caller_opts + nct_opt + annotations +
     intermediate_vcfs_to_merge = []
     slices_of_to_joins.each_with_index do |slice_of_to_joins,index|
       cmd = "qsub -pe threaded 4 -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N #{alphabet[index]}_#{name_base}_variants_merge \\
-      -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
+      -l mem_free=4G,virtual_free=4G,h_vmem=9G gatk -T CombineVariants \\
       -genotypeMergeOptions UNSORTED \\
       --assumeIdenticalSamples \\
       -nt 4 \\
@@ -363,7 +363,7 @@ gatk -T #{@options.caller}) + caller_opts + nct_opt + annotations +
     end
     
     cmd = "qsub -pe threaded 4 -q ngs.q -m e -b y -V -j y -cwd -q ngs.q -N final_#{name_base}_variants_merge \\
-    -l mem_free=4G,virtual_free=4G,h_vmem=6G gatk -T CombineVariants \\
+    -l mem_free=4G,virtual_free=4G,h_vmem=9G gatk -T CombineVariants \\
     -genotypeMergeOptions UNSORTED \\
     --assumeIdenticalSamples \\
     -nt 4 \\
