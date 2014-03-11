@@ -101,7 +101,7 @@ module load samtools/0.1.19
 module unload picard
 module load picard/1.99
 module unload gatk
-module load gatk/2.8-1-g932cd3a
+module load gatk/3.0.0
 module unload fastqc
 module load fastqc/0.10.1
 module unload tabix
@@ -322,27 +322,41 @@ EOF
     end
   end
 
+  # output a -L interval file, if we have an interval
+  def opt_l_interval(data)
+    if data.first[:interval_file]
+      "-L #{data.first[:interval_file]}"
+    else
+      ""
+    end
+  end
+
   
 
   def variant_call(sample_name,data)
-    if @default_config[:opts][:skip_vcf]
+    if @default_config[:opts][:skip_gvcf]
       return ""
     else
       bam_dir = "13_final_bam"
       bam_dir = "14_reduced_bam" if @default_config[:opts][:reduce_reads]
       ERB.new(<<-EOF
-      # Finally call individuals indels & snps
+      # Finally Haplotypecaller in gVCF mode or is Gvcf mode
 
-      qsub -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants -l mem_free=4G,h_vmem=8G gatk -T UnifiedGenotyper -A AlleleBalance -l INFO -nct 3 -R ${GATK_REF} -glm BOTH -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>_variants.vcf -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> -stand_emit_conf 10.0 <%= opt_d_rod_path(data) %>
+      export JAVA_MEM_OPTS="-Xmx24G"
+      qsub -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
+      -l virtual_free=12G,mem_free=12G,h_vmem=28G gatk -T HaplotypeCaller -ERC GVCF -nct 2 -R ${GATK_REF} \\
+      -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
+      -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
+      # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
 
       if [ "$?" -ne "0" ]; then
        echo -e Failure
        exit 1
       fi
 
-      bgzip <%= sample_name %>_variants.vcf
-      tabix <%= sample_name %>_variants.vcf.gz
-      EOF
+      bgzip <%= sample_name %>.gvcf
+      tabix -p vcf <%= sample_name %>_variants.vcf.gz
+EOF
       ).result(binding)
     end
   end
@@ -829,9 +843,6 @@ fi #if 05_dup_marked/cleaned.bam already existed
 # fastqc info
 #qsub -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
-<%= reduce_reads(@sample_name,@data) %>
-
-<%= variant_call(@sample_name,@data) %>
 
 # Clean up after ourselves
 rm -rf 00_inputs \
@@ -844,6 +855,9 @@ rm -rf 00_inputs \
 10_recalibrated_bam \
 11_calibated_covariates 
 
+<%= reduce_reads(@sample_name,@data) %>
+
+<%= variant_call(@sample_name,@data) %>
 
 <%=
   if (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) then
