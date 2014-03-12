@@ -277,7 +277,9 @@ Dir.chdir(@options.output_base_dir) do
       exit(1)
     else
       FileUtils.move(vqsr_output_file(base_vcf_name,"R.pdf"),File.join("..","#{base_vcf_name}-vqsr_recalibrated.pdf"))
-      FileUtils.move(vqsr_output_file(base_vcf_name,"tranches.pdf"),File.join("..","#{base_vcf_name}-vqsr_recalibrated-tranches.pdf"))
+      if File.exists?(File.join(vqsr_output_file(base_vcf_name,"tranches.pdf")))
+        FileUtils.move(vqsr_output_file(base_vcf_name,"tranches.pdf"),File.join("..","#{base_vcf_name}-vqsr_recalibrated-tranches.pdf"))
+      end
     end
   end
 end
