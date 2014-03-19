@@ -355,7 +355,7 @@ EOF
       fi
 
       bgzip <%= sample_name %>.gvcf
-      tabix -p vcf <%= sample_name %>_variants.vcf.gz
+      tabix -p vcf <%= sample_name %>_variants.gvcf.gz
 EOF
       ).result(binding)
     end
