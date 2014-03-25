@@ -108,6 +108,8 @@ module unload tabix
 module load tabix/0.2.6
 module unload btangs
 module load btangs/1.6.0
+
+set -o pipefail
     EOS
   end
 end
