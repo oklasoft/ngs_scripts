@@ -36,7 +36,7 @@
 # Stuart Glenn <Stuart-Glenn@omrf.org>
 #
 # ==Copyright
-#  Copyright (c) 2011 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
+#  Copyright (c) 2011-2014 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
 #  All rights reserved.
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions are met:
@@ -529,8 +529,8 @@ end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "3.0.0"
-  REVISION_DATE = "20140319"
+  VERSION       = "3.1.0"
+  REVISION_DATE = "20140325"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2012-2014 Oklahoma Medical Research Foundation"
 
@@ -560,7 +560,13 @@ class AnalysisTemplaterApp
 
   # Do the work of running this app
   def run_real
-    @default_config = (@config["DEFAULT"] || [{:run => nil, :lane => nil, :bwa_ref => nil, :gatk_ref => nil, :snp_rod => nil,:opts=>{:skip_btangs => false, :skip_dupes =>false, :skip_vcf => false, :skip_indel_realign => false, :reduce_reads=>false}}]).first
+    @default_config = (@config["DEFAULT"] || [
+                       {:run => nil, :lane => nil, :bwa_ref => nil,
+                         :gatk_ref => nil, :snp_rod => nil,
+                         :opts=>{:skip_btangs => true, :skip_gvcf => false,
+                           :skip_indel_realign => false,
+                           :reduce_reads=>false}
+                       }]).first
 
     statii = @options.samples.map do |sample_name|
       process_sample(sample_name)
