@@ -333,7 +333,6 @@ EOF
     end
   end
 
-  
 
   def variant_call(sample_name,data)
     if @default_config[:opts][:skip_gvcf]
