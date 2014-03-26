@@ -335,12 +335,17 @@ EOF
 
 
   def variant_call(sample_name,data)
+    bam_dir = ''
     if @default_config[:opts][:skip_gvcf]
       return ""
     else
       bam_dir = "13_final_bam"
       bam_dir = "14_reduced_bam" if @default_config[:opts][:reduce_reads]
-      ERB.new(<<-EOF
+    end
+    caller = ""
+    if data.first[:interval_file] then
+      # if we have an interval file, just do it with that
+      caller = ERB.new(<<-EOF
       # Finally Haplotypecaller in gVCF mode or is Gvcf mode
 
       export JAVA_MEM_OPTS="-Xmx24G"
@@ -352,15 +357,58 @@ EOF
       # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
 
       if [ "$?" -ne "0" ]; then
-       echo -e Failure
+       echo -e "Failure GVCF"
        exit 1
       fi
-
-      bgzip <%= sample_name %>.gvcf
-      tabix -p vcf <%= sample_name %>_variants.gvcf.gz
 EOF
       ).result(binding)
+    else
+      caller = gvcf_by_chr(sample_name,data)
     end
+
+    return caller + ERB.new(<<-EOF
+
+    bgzip <%= sample_name %>.gvcf
+    tabix -p vcf <%= sample_name %>_variants.gvcf.gz
+EOF
+    ).result(binding)
+  end
+
+  def gvcf_by_chr(sample_name,data)
+    chr_gvcfs = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
+      "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.gvcf"
+    end
+    snprod = if data.first[:snp_rod] || @default_config[:snp_rod]
+      "-d ${GATK_DBSNP}"
+    else
+      ""
+    end
+    ERB.new(<<-EOF
+    # GVCF by chr for better/faster/stronger
+    mkdir 15_gvcf
+    export JAVA_MEM_OPTS="-Xmx16G"
+    qsub -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gvcf_by_chr \\
+    -l virtual_free=3G,mem_free=3G,h_vmem=18G haplocaller_qsub_tasked.rb -r ${GATK_REF} <%= snprod %> \\
+    -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
+
+    if [ "$?" -ne "0" ]; then
+     echo -e "Failure GVCFing"
+     exit 1
+    fi
+
+    export JAVA_MEM_OPTS="-Xmx24G"
+    qsub -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_gvcf \\
+    -l virtual_free=20G,mem_free=20G,h_vmem=30G gatk -T CombineGVCFs -R ${GATK_REF} \\
+    <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.gvcf
+
+    if [ "$?" -ne "0" ]; then
+     echo -e "Failure joining reduced reads"
+     exit 1
+    fi
+    rm -rf 15_gvcf
+
+    EOF
+    ).result(binding)
   end
 
   def reduce_reads(sample_name,data)
