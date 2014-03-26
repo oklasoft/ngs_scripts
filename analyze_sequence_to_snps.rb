@@ -216,7 +216,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub -pe threaded 8 -l virtual_free=2G,mem_free=2G,h_vmem=32G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
+    cmd = "qsub -pe threaded 8 -l virtual_free=3G,mem_free=3G,h_vmem=32G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -346,7 +346,8 @@ EOF
 
       export JAVA_MEM_OPTS="-Xmx24G"
       qsub -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
-      -l virtual_free=12G,mem_free=12G,h_vmem=28G gatk -T HaplotypeCaller --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 2 -R ${GATK_REF} \\
+      -l virtual_free=12G,mem_free=12G,h_vmem=28G gatk -T HaplotypeCaller \\
+      --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 2 -R ${GATK_REF} \\
       -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
       -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
       # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
