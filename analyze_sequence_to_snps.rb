@@ -245,34 +245,6 @@ class AnalysisTemplate < Template
 
   end
 
-  def create_original_sam_inputs(sample_name,data)
-    cmd = "qsub -l virtual_free=10G,h_vmem=50G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_convert_to_sam convert_fastq_to_bam_qsub_tasked.rb 00_inputs Illumina #{sample_name}"
-    @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
-      if data[index][:is_paired]
-        cmd += " paired"
-      else
-        cmd += " single"
-      end
-
-      cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]} #{data[index][:lane]} #{data[index][:quality_type] || "Illumina"}"
-
-      # fastq file(s)
-      lane_shell_vars.each do |v|
-        cmd += " ${#{v}}"
-      end
-    end
-    return cmd
-  end
-
-  def fix_sam_read_group(sample_name,data)
-    cmd = "qsub -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_fix_sam_rg fix_sam_rg_qsub_tasked.rb 02_bwa_alignment Illumina #{sample_name}"
-    @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
-      # rg
-      cmd += " #{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}"
-    end
-    return cmd
-  end
-
   def default_rg(sample_name,data)
     return ""
     return "" if data.first[:is_paired]
@@ -835,7 +807,6 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 #qsub -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
-#mkdir 00_inputs
 export JAVA_MEM_OPTS="-Xmx16G"
 
 # Now take those & actually generate the alignment SAM output, paired or single
@@ -848,19 +819,6 @@ if [ "$?" -ne "0" ]; then
   echo -e "Failure with bwa alignment"
   exit 1
 fi
-
-
-# Going forward let us play with BAM files
-# We will sort the individual aligned SAM files so we can merge, sort, & mark dupes in one action
-#mkdir 03_sorted_bams
-#qsub -l virtual_free=4G,h_vmem=56G -o logs -sync y -t 1-<%= total_number_input_sequenced_lanes() %> -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_sort_sams sort_sam_qsub_tasked.rb 03_sorted_bams <%= input_sam_bam_files("02_bwa_alignment","sam") %>
-
-#if [ "$?" -ne "0" ]; then
-  #echo -e "Failure sorting aligned sams"
-  #exit 1
-#fi
-
-rm -rf 00_inputs 01_bwa_aln_sai 02_bwa_alignment
 
 
 # Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
