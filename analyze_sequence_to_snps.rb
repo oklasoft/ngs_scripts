@@ -93,24 +93,19 @@ class Template
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # be sure to start with a fresh & known enviroment (hopefully)
-source /etc/profile.d/profile-modules.sh
-module unload bwa
+. /usr/local/Modules/default/init/bash
+module purge
+module load sge
 module load bwa/0.7.6a
-module unload samtools
 module load samtools/0.1.19
-module unload picard
 module load picard/1.99
-module unload gatk
 module load gatk/3.1-1
-module unload fastqc
 module load fastqc/0.10.1
-module unload tabix
 module load tabix/0.2.6
-module unload btangs
 module load btangs/1.6.0
 
 set -o pipefail
-    EOS
+EOS
   end
 end
 
