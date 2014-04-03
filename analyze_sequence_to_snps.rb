@@ -94,8 +94,13 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # be sure to start with a fresh & known enviroment (hopefully)
 . /usr/local/Modules/default/init/bash
-module purge
-module load sge
+module unload bwa
+module unload samtools
+module unload picard
+module unload gatk
+module unload fastqc
+module unload tabix
+module unload btags
 module load bwa/0.7.6a
 module load samtools/0.1.19
 module load picard/1.99
