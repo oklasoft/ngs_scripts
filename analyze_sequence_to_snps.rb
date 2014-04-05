@@ -346,7 +346,7 @@ EOF
     return caller + ERB.new(<<-EOF
 
     bgzip <%= sample_name %>.gvcf
-    tabix -p vcf <%= sample_name %>_variants.gvcf.gz
+    tabix -p vcf <%= sample_name %>.gvcf.gz
 EOF
     ).result(binding)
   end
