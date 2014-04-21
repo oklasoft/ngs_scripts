@@ -326,9 +326,9 @@ EOF
       # Finally Haplotypecaller in gVCF mode or is Gvcf mode
 
       export JAVA_MEM_OPTS="-Xmx24G"
-      qsub <%= qsub_opts() %> -pe threaded 2 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
-      -l virtual_free=12G,mem_free=12G,h_vmem=28G gatk -T HaplotypeCaller \\
-      --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 2 -R ${GATK_REF} \\
+      qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
+      -l virtual_free=6G,mem_free=6G,h_vmem=28G gatk -T HaplotypeCaller \\
+      --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
       -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
       -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
       # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
