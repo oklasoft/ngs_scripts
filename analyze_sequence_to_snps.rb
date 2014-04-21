@@ -72,27 +72,36 @@ require 'ostruct'
 
 class Template
 
-  # Create instance
-  # *+default_config+ - Default options
-  # *+sample_name+ - Name of this sample
-  # *+data+ - Hash of options for this sample, overrides anything in default_config
-  def initialize(default_config,sample_name,data)
-    @default_config = default_config
-    @sample_name = sample_name
-    @data = data
-  end #initialize(default_config,sample_name,data)
+# Create instance
+# *+default_config+ - Default options
+# *+sample_name+ - Name of this sample
+# *+data+ - Hash of options for this sample, overrides anything in default_config
+def initialize(default_config,sample_name,data)
+  @default_config = default_config
+  @sample_name = sample_name
+  @data = data
+end #initialize(default_config,sample_name,data)
 
-  def to_s
-    ERB.new(script_template()).result(binding)
+def to_s
+  ERB.new(script_template()).result(binding)
+end
+
+def qsub_opts()
+  @default_config[:opts][:qsub_opts]
+end
+
+def tmp_dir_base_opt()
+  base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || nil
+  if base
+    "--tmpdir \"#{base}\""
+  else
+    ""
   end
-
-  def qsub_opts()
-    @default_config[:opts][:qsub_opts]
-  end
+end
 
 
-  def bash_header()
-    <<-EOS
+def bash_header()
+  <<-EOS
 #!/bin/bash
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
@@ -116,19 +125,19 @@ module load btangs/1.6.0
 
 set -o pipefail
 EOS
-  end
+end
 end
 
 class UnalignedExtractTemplate < Template
 
-  def bam_to_fastq_for_run(run,bam_index)
-    cmd = "bam2fastq --no-aligned --unaligned -o unaligned_fastq/#{@sample_name}_unaligned_#{run[:run]}_#{run[:lane]}\#_sequence.txt 03_first_bam/#{bam_index}.bam"
-    cmd = "qsub #{qsub_opts} -o logs -b y -j y -cwd -V -q ngs.q -l h_vmem=8G -sync y -N a_#{@sample_name}_unaligned_#{bam_index} #{cmd}"
-    return cmd
-  end
+def bam_to_fastq_for_run(run,bam_index)
+  cmd = "bam2fastq --no-aligned --unaligned -o unaligned_fastq/#{@sample_name}_unaligned_#{run[:run]}_#{run[:lane]}\#_sequence.txt 03_first_bam/#{bam_index}.bam"
+  cmd = "qsub #{qsub_opts} -o logs -b y -j y -cwd -V -q ngs.q -l h_vmem=8G -sync y -N a_#{@sample_name}_unaligned_#{bam_index} #{cmd}"
+  return cmd
+end
 
-  def script_template()
-    <<-EOS
+def script_template()
+  <<-EOS
 <%= bash_header() %>
 module unload bam2fastq
 module load bam2fastq/1.1.0
@@ -137,660 +146,665 @@ mkdir unaligned_fastq
 <% @data.each_with_index do |run,i| %>
 <%= bam_to_fastq_for_run(run,i) %>
 if [ "$?" -ne "0" ]; then
- echo -e "Failure extracting unalinged from bam <%= i %>"
- exit 1
+echo -e "Failure extracting unalinged from bam <%= i %>"
+exit 1
 fi
 <% end %>
 qsub <%= qsub_opts() %> -o logs -b y -V -j y -cwd -q ngs.q -sync y -N a_<%=@sample_name%>_unaligned_gzip gzip -7 unaligned_fastq/*_sequence.txt
 
 rm -rf 03_first_bam
-    EOS
-  end
+  EOS
+end
 end
 
 class AnalysisTemplate < Template
 
-  def fastq_file_list(sample_name,data)
-    fastqs = []
-    @fastq_shell_vars = {}
-    @fastq_shell_vars_by_lane = []
-    @input_sam_files = []
-    letters = %w/A B C D E F G H I J K L M N O P Q R S T U V W X Y Z/
-    data.each_with_index do |sequence,s_i|
-      letter = letters[s_i]
-      @fastq_shell_vars_by_lane << []
-      sequence[:inputs].each_with_index do |input,i_i|
-        prefix = "#{sample_name}_#{sequence[:run]}_#{sequence[:lane]}".downcase
-        cleaned_prefix = "#{sample_name}_cleaned_#{sequence[:run]}_#{sequence[:lane]}".downcase
-        pair_part = sequence[:is_paired] ? i_i+1 : 0
-        shell_var = "FASTQ#{fastqs.size+1}"
-        base_file = "#{cleaned_prefix}_#{pair_part}".downcase
-        path = if @default_config[:opts][:skip_btangs]
-          input
-        else
-          "`pwd`\"/#{prefix}/#{base_file}.fastq\""
-        end
-        fastqs << "#{shell_var}=#{path}"
-        @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
-        @fastq_shell_vars_by_lane[-1] << shell_var
-        @input_sam_files << {:index => s_i, :b_index => pair_part}
-      end
-    end
-    fastqs.join("\n")
-  end
-
-  def fastq_shell_vars()
-    @fastq_shell_vars.keys.map{|v| "${#{v}}"}.join(" ")
-  end
-
-
-  def ordered_bam_inputs()
-    @input_sam_files.map {|s| "#{s[:b_index]} ./00_inputs/#{s[:index]}.bam"}.join(" ")
-  end
-
-  def cleanup_cleaned_fastq_files(sample_name)
-    return "echo noop" if @default_config[:opts][:skip_btangs]
-    #qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
-    cmds = []
-    @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
-      cmds << "rm -f ${#{input}}"
-      cmds << "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_gzip_#{i}_rejects gzip -9 #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
-    end
-    cmds.join("\n")
-  end
-
-  def total_number_input_sequence_files
-    @fastq_shell_vars.keys.size
-  end
-
-  def total_number_input_sequenced_lanes
-    @fastq_shell_vars_by_lane.size
-  end
-
-  def link_fastq_inputs()
-    #ln -s ${FASTQ1} 00_inputs/A_1.fastq
-    lines = []
-    @fastq_shell_vars.each do |var,data|
-      lines << "ln -s ${#{var}} 00_inputs/#{data[:letter]}_#{data[:paired]}.fastq"
-    end
-    lines.join("\n")
-  end
-
-  def bwa_reference_for_data(data)
-    data.first[:bwa_ref] || @default_config[:bwa_ref]
-  end
-
-  def bwa_alignment_command(sample_name,data)
-    cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=3G,mem_free=3G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
-    @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
-      if data[index][:is_paired]
-        cmd += " paired"
+def fastq_file_list(sample_name,data)
+  fastqs = []
+  @fastq_shell_vars = {}
+  @fastq_shell_vars_by_lane = []
+  @input_sam_files = []
+  letters = %w/A B C D E F G H I J K L M N O P Q R S T U V W X Y Z/
+  data.each_with_index do |sequence,s_i|
+    letter = letters[s_i]
+    @fastq_shell_vars_by_lane << []
+    sequence[:inputs].each_with_index do |input,i_i|
+      prefix = "#{sample_name}_#{sequence[:run]}_#{sequence[:lane]}".downcase
+      cleaned_prefix = "#{sample_name}_cleaned_#{sequence[:run]}_#{sequence[:lane]}".downcase
+      pair_part = sequence[:is_paired] ? i_i+1 : 0
+      shell_var = "FASTQ#{fastqs.size+1}"
+      base_file = "#{cleaned_prefix}_#{pair_part}".downcase
+      path = if @default_config[:opts][:skip_btangs]
+        input
       else
-        cmd += " single"
+        "`pwd`\"/#{prefix}/#{base_file}.fastq\""
       end
-
-      # rg
-      cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
-
-      # 01_bwa_aln_sai file(s)
-      #lane_shell_vars.each do |v|
-        ## cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
-        #cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
-      #end
-      # fastq file(s)
-      lane_shell_vars.each do |v|
-        cmd += " ${#{v}}"
-        #cmd += " 00_inputs/#{index}.bam"
-      end
+      fastqs << "#{shell_var}=#{path}"
+      @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
+      @fastq_shell_vars_by_lane[-1] << shell_var
+      @input_sam_files << {:index => s_i, :b_index => pair_part}
     end
-    return cmd
   end
+  fastqs.join("\n")
+end
 
-  def extract_unaligned(sample_name,data)
+def fastq_shell_vars()
+  @fastq_shell_vars.keys.map{|v| "${#{v}}"}.join(" ")
+end
 
+
+def ordered_bam_inputs()
+  @input_sam_files.map {|s| "#{s[:b_index]} ./00_inputs/#{s[:index]}.bam"}.join(" ")
+end
+
+def cleanup_cleaned_fastq_files(sample_name)
+  return "echo noop" if @default_config[:opts][:skip_btangs]
+  #qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
+  cmds = []
+  @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
+    cmds << "rm -f ${#{input}}"
+    cmds << "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_gzip_#{i}_rejects gzip -9 #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
   end
+  cmds.join("\n")
+end
 
-  def default_rg(sample_name,data)
+def total_number_input_sequence_files
+  @fastq_shell_vars.keys.size
+end
+
+def total_number_input_sequenced_lanes
+  @fastq_shell_vars_by_lane.size
+end
+
+def link_fastq_inputs()
+  #ln -s ${FASTQ1} 00_inputs/A_1.fastq
+  lines = []
+  @fastq_shell_vars.each do |var,data|
+    lines << "ln -s ${#{var}} 00_inputs/#{data[:letter]}_#{data[:paired]}.fastq"
+  end
+  lines.join("\n")
+end
+
+def bwa_reference_for_data(data)
+  data.first[:bwa_ref] || @default_config[:bwa_ref]
+end
+
+def bwa_alignment_command(sample_name,data)
+  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=3G,mem_free=3G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
+  @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
+    if data[index][:is_paired]
+      cmd += " paired"
+    else
+      cmd += " single"
+    end
+
+    # rg
+    cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
+
+    # 01_bwa_aln_sai file(s)
+    #lane_shell_vars.each do |v|
+      ## cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
+      #cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
+    #end
+    # fastq file(s)
+    lane_shell_vars.each do |v|
+      cmd += " ${#{v}}"
+      #cmd += " 00_inputs/#{index}.bam"
+    end
+  end
+  return cmd
+end
+
+def extract_unaligned(sample_name,data)
+
+end
+
+def default_rg(sample_name,data)
+  return ""
+  return "" if data.first[:is_paired]
+  data = data.first
+  "--default_read_group #{sample_name}_#{data[:run]}_s_#{data[:lane]} --default_platform Illumina"
+end
+
+
+def input_sam_bam_files(prefix,suffix)
+  cmd = ""
+  # 02_bwa_alignment/A.sam 02_bwa_alignment/B.sam
+  (0...@fastq_shell_vars_by_lane.size()).to_a.each do |i|
+    cmd += "#{prefix}/#{i}.#{suffix} "
+  end
+  cmd
+end
+
+def clean_commands(sample_name,data)
+  return if @default_config[:opts][:skip_btangs]
+  #clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
+  cleans = []
+  data.each_with_index do |sequence,s_i|
+    cmd = "clean_sample.rb -s #{sample_name} -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
+    if sequence[:trim_end]
+      cmd += " --trim-end #{sequence[:trim_end]}"
+    end
+    unless sequence[:is_paired]
+      cmd += " --single-end"
+    end
+    cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
+    cleans << "qsub #{qsub_opts()} -pe threaded 2 -l hadoop=1,h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
+  end
+  cleans.join("\n") + <<-EOF
+
+  if [ "$?" -ne "0" ]; then
+    echo -e "Failure with btang cleaning"
+    exit 1
+  fi 
+
+EOF
+end
+
+# output a -D SNP rod file, if we have a snp_rod
+def opt_d_rod_path(data)
+  if data.first[:snp_rod] || @default_config[:snp_rod]
+    "-D ${GATK_DBSNP}"
+  else
+    ""
+  end
+end
+
+# output a -L interval file, if we have an interval
+def opt_l_interval(data)
+  if data.first[:interval_file]
+    "-L #{data.first[:interval_file]}"
+  else
+    ""
+  end
+end
+
+
+def variant_call(sample_name,data)
+  bam_dir = ''
+  if @default_config[:opts][:skip_gvcf]
     return ""
-    return "" if data.first[:is_paired]
-    data = data.first
-    "--default_read_group #{sample_name}_#{data[:run]}_s_#{data[:lane]} --default_platform Illumina"
+  else
+    bam_dir = "13_final_bam"
+    bam_dir = "14_reduced_bam" if @default_config[:opts][:reduce_reads]
   end
+  caller = ""
+  if data.first[:interval_file] then
+    # if we have an interval file, just do it with that
+    caller = ERB.new(<<-EOF
+    # Finally Haplotypecaller in gVCF mode or is Gvcf mode
 
-
-  def input_sam_bam_files(prefix,suffix)
-    cmd = ""
-    # 02_bwa_alignment/A.sam 02_bwa_alignment/B.sam
-    (0...@fastq_shell_vars_by_lane.size()).to_a.each do |i|
-      cmd += "#{prefix}/#{i}.#{suffix} "
-    end
-    cmd
-  end
-
-  def clean_commands(sample_name,data)
-    return if @default_config[:opts][:skip_btangs]
-    #clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
-    cleans = []
-    data.each_with_index do |sequence,s_i|
-      cmd = "clean_sample.rb -s #{sample_name} -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
-      if sequence[:trim_end]
-        cmd += " --trim-end #{sequence[:trim_end]}"
-      end
-      unless sequence[:is_paired]
-        cmd += " --single-end"
-      end
-      cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-      cleans << "qsub #{qsub_opts()} -pe threaded 2 -l hadoop=1,h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
-    end
-    cleans.join("\n") + <<-EOF
+    export JAVA_MEM_OPTS="-Xmx24G"
+    qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
+    -l virtual_free=6G,mem_free=6G,h_vmem=28G gatk -T HaplotypeCaller \\
+    --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
+    -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
+    # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
 
     if [ "$?" -ne "0" ]; then
-      echo -e "Failure with btang cleaning"
-      exit 1
-    fi 
-
-EOF
-  end
-
-  # output a -D SNP rod file, if we have a snp_rod
-  def opt_d_rod_path(data)
-    if data.first[:snp_rod] || @default_config[:snp_rod]
-      "-D ${GATK_DBSNP}"
-    else
-      ""
-    end
-  end
-
-  # output a -L interval file, if we have an interval
-  def opt_l_interval(data)
-    if data.first[:interval_file]
-      "-L #{data.first[:interval_file]}"
-    else
-      ""
-    end
-  end
-
-
-  def variant_call(sample_name,data)
-    bam_dir = ''
-    if @default_config[:opts][:skip_gvcf]
-      return ""
-    else
-      bam_dir = "13_final_bam"
-      bam_dir = "14_reduced_bam" if @default_config[:opts][:reduce_reads]
-    end
-    caller = ""
-    if data.first[:interval_file] then
-      # if we have an interval file, just do it with that
-      caller = ERB.new(<<-EOF
-      # Finally Haplotypecaller in gVCF mode or is Gvcf mode
-
-      export JAVA_MEM_OPTS="-Xmx24G"
-      qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
-      -l virtual_free=6G,mem_free=6G,h_vmem=28G gatk -T HaplotypeCaller \\
-      --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
-      -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
-      -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
-      # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
-
-      if [ "$?" -ne "0" ]; then
-       echo -e "Failure GVCF"
-       exit 1
-      fi
-EOF
-      ).result(binding)
-    else
-      caller = gvcf_by_chr(sample_name,data)
-    end
-
-    return caller + ERB.new(<<-EOF
-
-    bgzip <%= sample_name %>.gvcf
-    tabix -p vcf <%= sample_name %>.gvcf.gz
+     echo -e "Failure GVCF"
+     exit 1
+    fi
 EOF
     ).result(binding)
+  else
+    caller = gvcf_by_chr(sample_name,data)
   end
 
-  def gvcf_by_chr(sample_name,data)
-    chr_gvcfs = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
-      "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.gvcf"
-    end
-    snprod = if data.first[:snp_rod] || @default_config[:snp_rod]
-      "-d ${GATK_DBSNP}"
-    else
-      ""
-    end
+  return caller + ERB.new(<<-EOF
+
+  bgzip <%= sample_name %>.gvcf
+  tabix -p vcf <%= sample_name %>.gvcf.gz
+EOF
+  ).result(binding)
+end
+
+def gvcf_by_chr(sample_name,data)
+  chr_gvcfs = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
+    "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.gvcf"
+  end
+  snprod = if data.first[:snp_rod] || @default_config[:snp_rod]
+    "-d ${GATK_DBSNP}"
+  else
+    ""
+  end
+  ERB.new(<<-EOF
+  # GVCF by chr for better/faster/stronger
+  mkdir 15_gvcf
+  export JAVA_MEM_OPTS="-Xmx16G"
+  qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gvcf_by_chr \\
+  -l virtual_free=3G,mem_free=3G,h_vmem=18G haplocaller_qsub_tasked.rb -r ${GATK_REF} <%= snprod %> \\
+  -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure GVCFing"
+   exit 1
+  fi
+
+  export JAVA_MEM_OPTS="-Xmx24G"
+  qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_gvcf \\
+  -l virtual_free=20G,mem_free=20G,h_vmem=30G gatk -T CombineGVCFs -R ${GATK_REF} \\
+  <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.gvcf
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure joining reduced reads"
+   exit 1
+  fi
+  rm -rf 15_gvcf
+
+  EOF
+  ).result(binding)
+end
+
+def reduce_reads(sample_name,data)
+  chr_bams = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
+    "INPUT=14_reduced_bam/by_chr/#{sample_name}-#{chr}.bam"
+  end
+  if @default_config[:opts][:reduce_reads]
     ERB.new(<<-EOF
-    # GVCF by chr for better/faster/stronger
-    mkdir 15_gvcf
+    # Make a reduce reads BAM for variant calling better/faster/stronger
+    mkdir 14_reduced_bam
     export JAVA_MEM_OPTS="-Xmx16G"
-    qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gvcf_by_chr \\
-    -l virtual_free=3G,mem_free=3G,h_vmem=18G haplocaller_qsub_tasked.rb -r ${GATK_REF} <%= snprod %> \\
-    -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
+    qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l virtual_free=8G,mem_free=12G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
     if [ "$?" -ne "0" ]; then
-     echo -e "Failure GVCFing"
+     echo -e "Failure reducing reads"
      exit 1
     fi
 
     export JAVA_MEM_OPTS="-Xmx24G"
-    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_gvcf \\
-    -l virtual_free=20G,mem_free=20G,h_vmem=30G gatk -T CombineGVCFs -R ${GATK_REF} \\
-    <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.gvcf
+    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure joining reduced reads"
      exit 1
     fi
-    rm -rf 15_gvcf
+    mv 14_reduced_bam/<%= sample_name %>.bai 14_reduced_bam/<%= sample_name %>.bam.bai
+    rm -rf 14_reduced_bam/by_chr
 
     EOF
     ).result(binding)
+  else
+    return ""
   end
+end
 
-  def reduce_reads(sample_name,data)
-    chr_bams = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
-      "INPUT=14_reduced_bam/by_chr/#{sample_name}-#{chr}.bam"
-    end
-    if @default_config[:opts][:reduce_reads]
-      ERB.new(<<-EOF
-      # Make a reduce reads BAM for variant calling better/faster/stronger
-      mkdir 14_reduced_bam
-      export JAVA_MEM_OPTS="-Xmx16G"
-      qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l virtual_free=8G,mem_free=12G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
-
-      if [ "$?" -ne "0" ]; then
-       echo -e "Failure reducing reads"
-       exit 1
-      fi
-
-      export JAVA_MEM_OPTS="-Xmx24G"
-      qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
-
-      if [ "$?" -ne "0" ]; then
-       echo -e "Failure joining reduced reads"
-       exit 1
-      fi
-      mv 14_reduced_bam/<%= sample_name %>.bai 14_reduced_bam/<%= sample_name %>.bam.bai
-      rm -rf 14_reduced_bam/by_chr
-
-      EOF
-      ).result(binding)
-    else
-      return ""
-    end
+def known_indels_opts()
+  if @default_config[:known_indels]
+    return @default_config[:known_indels].map {|i| "-known #{i}"}.join(" ")
+  else
+    return ""
   end
-  
-  def known_indels_opts()
-    if @default_config[:known_indels]
-      return @default_config[:known_indels].map {|i| "-known #{i}"}.join(" ")
-    else
-      return ""
-    end
-  end
+end
 
-  def indel_realign(sample_name,data)
-    if @default_config[:opts][:skip_indel_realign]
-      return <<-EOF
-        ln -s 05_dup_marked 07_realigned_bam
-      EOF
-    else
-      indel_realignment(sample_name,data)
-    end
-  end
-
-  def indel_realignment(sample_name,data)
-    compression = if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
-                    ""
-                  else
-                    "--bam_compression 7"
-                  end
-    ERB.new(<<-EOF
-      # Calculate intervals for realignment
-      mkdir 06_intervals
-      qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l virtual_free=1G,mem_free=1G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
-
-      if [ "$?" -ne "0" ]; then
-       echo -e "Failure with target realigment creation"
-       exit 1
-      fi
-
-      # Now realign & fix any mate info
-      mkdir 07_realigned_bam
-      unset JAVA_MEM_OPTS
-      qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l virtual_free=5G,mem_free=4G,h_vmem=8G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
-
-      if [ "$?" -ne "0" ]; then
-       echo -e "Failure with indel realigmnent"
-       exit 1
-      fi
+def indel_realign(sample_name,data)
+  if @default_config[:opts][:skip_indel_realign]
+    return <<-EOF
+      ln -s 05_dup_marked 07_realigned_bam
     EOF
-    ).result(binding)
+  else
+    indel_realignment(sample_name,data)
   end
+end
 
-  def mark_dupes_or_skip(sample_name,data)
-    if @default_config[:opts][:skip_dupes]
-      <<-EOF
+def indel_realignment(sample_name,data)
+  compression = if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
+                  ""
+                else
+                  "--bam_compression 7"
+                end
+  ERB.new(<<-EOF
+    # Calculate intervals for realignment
+    mkdir 06_intervals
+    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l virtual_free=1G,mem_free=1G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
+
+    if [ "$?" -ne "0" ]; then
+     echo -e "Failure with target realigment creation"
+     exit 1
+    fi
+
+    # Now realign & fix any mate info
+    mkdir 07_realigned_bam
+    unset JAVA_MEM_OPTS
+    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l virtual_free=5G,mem_free=4G,h_vmem=8G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
+
+    if [ "$?" -ne "0" ]; then
+     echo -e "Failure with indel realigmnent"
+     exit 1
+    fi
+  EOF
+  ).result(binding)
+end
+
+def mark_dupes_or_skip(sample_name,data)
+  if @default_config[:opts][:skip_dupes]
+    <<-EOF
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure with merging the sams"
-  exit 1
+echo -e "Failure with merging the sams"
+exit 1
 fi
-      EOF
-    else
-      mark_dupes(sample_name,data)
-    end
+    EOF
+  else
+    mark_dupes(sample_name,data)
   end
-  
-  def mark_dupes(sample_name,data)
-    <<-EOF
+end
+
+def mark_dupes(sample_name,data)
+  <<-EOF
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure with marking the duplicates"
-  exit 1
+echo -e "Failure with marking the duplicates"
+exit 1
 fi
-    EOF
-  end
-
-  def covariate_or_final(sample_name,data)
-    if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
-      covariate_recalibration(sample_name,data)
-    else
-      skip_covariate_recalibration(sample_name,data)
-    end
-  end
-
-  def skip_covariate_recalibration(sample_name,data)
-    <<-EOF
-    mkdir 13_final_bam
-    mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
-    mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bai
-    EOF
-  end
-
-  def recalibration_known_sites()
-    @default_config[:recalibration_known_sites].map {|s| "--knownSites #{s}"}.join(" ")
-  end
-
-  def covariate_recalibration(sample_name,data)
-    ERB.new(<<-EOF
-    # BaseRecalibrator
-    mkdir 08_uncalibated_covariates
-    unset JAVA_MEM_OPTS
-    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l virtual_free=1G,mem_free=4G,h_vmem=8G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 6
-
-    if [ "$?" -ne "0" ]; then
-     echo -e "Failure counting covariates"
-     exit 1
-    fi
-
-    mkdir 10_recalibrated_bam
-    unset JAVA_MEM_OPTS
-    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l virtual_free=1G,mem_free=4G,h_vmem=8G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 7 -nct 6
-
-    if [ "$?" -ne "0" ]; then
-     echo -e "Failure reclibrating bam"
-     exit 1
-    fi
-
-    mkdir 13_final_bam
-
-    mv ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>.bam
-    mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bam.bai
   EOF
-    ).result(binding)
-  end
+end
 
-  # What strand call confidence for UnifiedGenotyper
-  # Will depend on if we are doing vqsr
-  def unified_genotyper_strand_call_conf(data)
-    "30.0"
+def covariate_or_final(sample_name,data)
+  if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
+    covariate_recalibration(sample_name,data)
+  else
+    skip_covariate_recalibration(sample_name,data)
   end
+end
 
-  def script_template()
-    return DATA.read
-  end
+def skip_covariate_recalibration(sample_name,data)
+  <<-EOF
+  mkdir 13_final_bam
+  mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
+  mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bai
+  EOF
+end
+
+def recalibration_known_sites()
+  @default_config[:recalibration_known_sites].map {|s| "--knownSites #{s}"}.join(" ")
+end
+
+def covariate_recalibration(sample_name,data)
+  ERB.new(<<-EOF
+  # BaseRecalibrator
+  mkdir 08_uncalibated_covariates
+  unset JAVA_MEM_OPTS
+  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l virtual_free=1G,mem_free=4G,h_vmem=8G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 6
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure counting covariates"
+   exit 1
+  fi
+
+  mkdir 10_recalibrated_bam
+  unset JAVA_MEM_OPTS
+  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l virtual_free=1G,mem_free=4G,h_vmem=8G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 7 -nct 6
+
+  if [ "$?" -ne "0" ]; then
+   echo -e "Failure reclibrating bam"
+   exit 1
+  fi
+
+  mkdir 13_final_bam
+
+  mv ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>.bam
+  mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bam.bai
+EOF
+  ).result(binding)
+end
+
+# What strand call confidence for UnifiedGenotyper
+# Will depend on if we are doing vqsr
+def unified_genotyper_strand_call_conf(data)
+  "30.0"
+end
+
+def script_template()
+  return DATA.read
+end
 
 end
 
 
 class AnalysisTemplaterApp
-  VERSION       = "3.1.1"
-  REVISION_DATE = "20140421"
-  AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
-  COPYRIGHT     = "Copyright (c) 2012-2014 Oklahoma Medical Research Foundation"
+VERSION       = "3.1.1"
+REVISION_DATE = "20140421"
+AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
+COPYRIGHT     = "Copyright (c) 2012-2014 Oklahoma Medical Research Foundation"
 
-  # Set up the app to roun
-  # *+args+ - command line ARGS formatted type array
-  # *+ios+ - optional hash to set stdin, stdout, & stderr
-  def initialize(args,ios = {})
-    @stdin = ios[:stdin] || STDIN
-    @stdout = ios[:stdout] || STDOUT
-    @stderr = ios[:stderr] || STDERR
+# Set up the app to roun
+# *+args+ - command line ARGS formatted type array
+# *+ios+ - optional hash to set stdin, stdout, & stderr
+def initialize(args,ios = {})
+  @stdin = ios[:stdin] || STDIN
+  @stdout = ios[:stdout] || STDOUT
+  @stderr = ios[:stderr] || STDERR
 
-    @args = args
-    set_default_options()
-  end #initialize(args,ios)
+  @args = args
+  set_default_options()
+end #initialize(args,ios)
 
-  # Do the work
-  def run
-    if !options_parsed?() || !options_valid?()
-      @stderr.puts("")
-      output_usage(@stderr)
-      return 1
-    end
-    return run_real()
-  end #run
+# Do the work
+def run
+  if !options_parsed?() || !options_valid?()
+    @stderr.puts("")
+    output_usage(@stderr)
+    return 1
+  end
+  return run_real()
+end #run
 
-  private
+private
 
-  # Do the work of running this app
-  def run_real
-    @default_config = (@config["DEFAULT"] || [
-                       {:run => nil, :lane => nil, :bwa_ref => nil,
-                         :gatk_ref => nil, :snp_rod => nil,
-                         :opts=>{:skip_btangs => true, :skip_gvcf => false,
-                           :skip_indel_realign => false,
-                           :reduce_reads=>false}
-                       }]).first
+# Do the work of running this app
+def run_real
+  @default_config = (@config["DEFAULT"] || [
+                     {:run => nil, :lane => nil, :bwa_ref => nil,
+                       :gatk_ref => nil, :snp_rod => nil,
+                       :opts=>{:skip_btangs => true, :skip_gvcf => false,
+                         :skip_indel_realign => false,
+                         :reduce_reads=>false}
+                     }]).first
 
-    @default_config[:opts].merge!(:qsub_opts => @options.qsub_opts) if '' != @options.qsub_opts
-    statii = @options.samples.map do |sample_name|
-      process_sample(sample_name)
-    end
-    return statii.max
-  end #run
+  @default_config[:opts].merge!(:qsub_opts => @options.qsub_opts) if '' != @options.qsub_opts
+  @default_config[:opts].merge!(:tmp_dir_base => @options.tmp_dir_base) if @options.tmp_dir_base
+  statii = @options.samples.map do |sample_name|
+    process_sample(sample_name)
+  end
+  return statii.max
+end #run
 
-  # Make the dir, the analyze script and launch said script for sample_name
-  def process_sample(sample_name)
-    data = @config[sample_name]
-    data.each_with_index do |d,i|
-      data[i] = @default_config.merge(d)
-    end
-    if @options.debug
-      puts data.inspect
-      #exit 0
-      puts AnalysisTemplate.new(@default_config,sample_name,data)
-      if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
-        puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
-      end
-      return 0
-    end
-    output_dir = File.join(@options.output_base,sample_name)
-
-    unless Dir.mkdir(output_dir)
-      @stderr.puts "Failed to make dir: #{output_dir} for #{sample_name}"
-      return 1
-    end
-
-    script_file = File.join(output_dir,"analyze.sh")
-    File.open(script_file,"w") do |f|
-      f.puts AnalysisTemplate.new(@default_config,sample_name,data)
-    end
-
+# Make the dir, the analyze script and launch said script for sample_name
+def process_sample(sample_name)
+  data = @config[sample_name]
+  data.each_with_index do |d,i|
+    data[i] = @default_config.merge(d)
+  end
+  if @options.debug
+    puts data.inspect
+    #exit 0
+    puts AnalysisTemplate.new(@default_config,sample_name,data)
     if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
-      extract_script_file = File.join(output_dir,"extract_unaligned.sh") 
-      File.open(extract_script_file,"w") do |f|
-        f.puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
-      end
+      puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
+    end
+    return 0
+  end
+  output_dir = File.join(@options.output_base,sample_name)
+
+  unless Dir.mkdir(output_dir)
+    @stderr.puts "Failed to make dir: #{output_dir} for #{sample_name}"
+    return 1
+  end
+
+  script_file = File.join(output_dir,"analyze.sh")
+  File.open(script_file,"w") do |f|
+    f.puts AnalysisTemplate.new(@default_config,sample_name,data)
+  end
+
+  if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
+    extract_script_file = File.join(output_dir,"extract_unaligned.sh") 
+    File.open(extract_script_file,"w") do |f|
+      f.puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
+    end
+  end
+
+  return_dir = Dir.pwd
+  unless Dir.chdir(output_dir)
+    @stderr.puts "Failed to change to dir: #{output_dir} for #{sample_name}"
+    return 1
+  end
+
+  Dir.mkdir("logs")
+
+  # We sleep a random amount to avoid overloading SGE with a billion jobs right away
+  sleep(rand(@options.delay))
+  cmd = %W(qsub) + @options.qsub_opts.split(/ /) + %W(-o logs -sync y -b y -V -j y -cwd -q ngs.q -m e -N a_#{sample_name}_full ./analyze.sh)
+  cmd = %w(./analyze.sh) if @options.run_local
+  @stdout.puts(cmd.join(" "))
+  system(*cmd)
+  status = $?.exitstatus
+
+  Dir.chdir(return_dir)
+  return status
+end #process_sample(sample_name)
+
+# Parse the command line options, returning false on errors
+def options_parsed?
+  opts = OptionParser.new() do |o|
+    o.on('-v','--version') { output_version($stdout); exit(0) }
+    o.on('-h','--help') { output_help($stdout); exit(0) }
+    o.on('-V', '--verbose')    { @options.verbose = true }
+    o.on('-D', '--debug')    { @options.debug = true }
+    o.on('-l', '--local')    { @options.run_local = true }
+
+    o.on("-d","--delay", "=REQUIRED") do |amount|
+      @options.delay = amount.to_i
     end
 
-    return_dir = Dir.pwd
-    unless Dir.chdir(output_dir)
-      @stderr.puts "Failed to change to dir: #{output_dir} for #{sample_name}"
-      return 1
+    o.on("-c","--config", "=REQUIRED") do |conf_file|
+      @options.config_file = conf_file
     end
 
-    Dir.mkdir("logs")
-
-    # We sleep a random amount to avoid overloading SGE with a billion jobs right away
-    sleep(rand(@options.delay))
-    cmd = %W(qsub) + @options.qsub_opts.split(/ /) + %W(-o logs -sync y -b y -V -j y -cwd -q ngs.q -m e -N a_#{sample_name}_full ./analyze.sh)
-    cmd = %w(./analyze.sh) if @options.run_local
-    @stdout.puts(cmd.join(" "))
-    system(*cmd)
-    status = $?.exitstatus
-
-    Dir.chdir(return_dir)
-    return status
-  end #process_sample(sample_name)
-
-  # Parse the command line options, returning false on errors
-  def options_parsed?
-    opts = OptionParser.new() do |o|
-      o.on('-v','--version') { output_version($stdout); exit(0) }
-      o.on('-h','--help') { output_help($stdout); exit(0) }
-      o.on('-V', '--verbose')    { @options.verbose = true }
-      o.on('-D', '--debug')    { @options.debug = true }
-      o.on('-l', '--local')    { @options.run_local = true }
-
-      o.on("-d","--delay", "=REQUIRED") do |amount|
-        @options.delay = amount.to_i
-      end
-
-      o.on("-c","--config", "=REQUIRED") do |conf_file|
-        @options.config_file = conf_file
-      end
-
-      o.on("-o","--output", "=REQUIRED") do |output_destination|
-        @options.output_base = output_destination
-      end
-
-      o.on("-q","--qsub", "=REQUIRED") do |qopts|
-        @options.qsub_opts = qopts
-     end
+    o.on("-o","--output", "=REQUIRED") do |output_destination|
+      @options.output_base = output_destination
     end
 
-    opts.parse!(@args) rescue return false
-    @options.samples = @args
-    return true
-  end #options_parsed?
+    o.on("-q","--qsub", "=REQUIRED") do |qopts|
+      @options.qsub_opts = qopts
+   end
 
-  # Open/parase/load the YAML config file
-  def loaded_config?
-    begin
-      @config = YAML::load(File.open(@options.config_file))
-    rescue => err
-      @stderr.puts "Error loading config file: #{err}"
+    o.on("-t","--tmp", "=REQUIRED") do |opts|
+      @options.tmp_dir_base = opts
+    end
+  end
+
+  opts.parse!(@args) rescue return false
+  @options.samples = @args
+  return true
+end #options_parsed?
+
+# Open/parase/load the YAML config file
+def loaded_config?
+  begin
+    @config = YAML::load(File.open(@options.config_file))
+  rescue => err
+    @stderr.puts "Error loading config file: #{err}"
+    return false
+  end
+  return true
+end #loaded_config?
+
+# Test that the given output base dir exists & is writeabale
+def output_base_valid?
+  if File.exists?(@options.output_base)
+    if !File.directory?(@options.output_base)
+      @stderr.puts("Final output location, #{@options.output_base}, exists and is not a directory")
+      return false
+    elsif !File.writable?(@options.output_base)
+      @stderr.puts("Final output location, #{@options.output_base}, is not writable")
       return false
     end
-    return true
-  end #loaded_config?
-
-  # Test that the given output base dir exists & is writeabale
-  def output_base_valid?
-    if File.exists?(@options.output_base)
-      if !File.directory?(@options.output_base)
-        @stderr.puts("Final output location, #{@options.output_base}, exists and is not a directory")
-        return false
-      elsif !File.writable?(@options.output_base)
-        @stderr.puts("Final output location, #{@options.output_base}, is not writable")
-        return false
-      end
-    else
-      Dir.mkdir(@options.output_base)
-    end
-    return true
-  end #output_base_valid?
-
-  # Did the user provide us with additional args to use as sample ids
-  def have_sample_ids?
-    if @options.samples && @options.samples.size > 0
-      return true
-    end
-    @stderr.puts "Missing sample id(s) to processor"
-    return false
-  end #have_sample_ids?
-
-  # Are all the ids they gave in the config file actually
-  def sample_ids_in_config?
-    # check them all first
-    @options.samples.each do |s|
-      unless @config[s]
-        @stderr.puts "Can't find sample '#{s}' in config"
-        return false
-      end
-    end
-    return true
-  end #sample_ids_in_config?
-
-  # Makes sure the options we have make sense
-  def options_valid?
-    loaded_config? &&
-    output_base_valid? &&
-    have_sample_ids? &&
-    sample_ids_in_config?
-  end #options_valid?
-
-  # Set our default options
-  def set_default_options()
-    @options = OpenStruct.new(
-      :output_base => nil,
-      :verbose => false,
-      :config_file  => nil,
-      :samples => nil,
-      :delay => 30,
-      :qsub_opts => ''
-    )
-  end #set_default_options()
-
-  # Just print the usage message
-  def output_usage(out)
-    out.puts <<-EOF
-  analyze_sequence_to_snps.rb -c PATH_TO_CONFIG.YML -o PATH_TO_BASE_OUTPUT_DIR SAMPLE_ID [SAMPLE_ID]
-
-  Options
-  -h, --help             Display this help message
-  -v, --version          Display the version information
-  -V, --verbose          Increased verbosity of output
-  -d, --delay INT        Delay a random between 0 & INT before submitting job. Default 30 seonds
-  -c, --config FILE      Specify the configuration yaml file of options for analysis
-  -o, --output DIR       Specify the output directory prefix, all results will be saved under this directory
-  -l, --local            Run the analyze script locally, not with initial SGE submit
-  -q, --qsub OPTS        Additional options given to each qsub call
-    EOF
+  else
+    Dir.mkdir(@options.output_base)
   end
+  return true
+end #output_base_valid?
 
-  def output_version(out)
-    out.puts "#{File.basename(__FILE__)} Version: #{VERSION} Released: #{REVISION_DATE}"
+# Did the user provide us with additional args to use as sample ids
+def have_sample_ids?
+  if @options.samples && @options.samples.size > 0
+    return true
   end
+  @stderr.puts "Missing sample id(s) to processor"
+  return false
+end #have_sample_ids?
 
-  def output_help(out)
-    output_version(out)
-    out.puts ""
-    output_usage(out)
+# Are all the ids they gave in the config file actually
+def sample_ids_in_config?
+  # check them all first
+  @options.samples.each do |s|
+    unless @config[s]
+      @stderr.puts "Can't find sample '#{s}' in config"
+      return false
+    end
   end
+  return true
+end #sample_ids_in_config?
+
+# Makes sure the options we have make sense
+def options_valid?
+  loaded_config? &&
+  output_base_valid? &&
+  have_sample_ids? &&
+  sample_ids_in_config?
+end #options_valid?
+
+# Set our default options
+def set_default_options()
+  @options = OpenStruct.new(
+    :output_base => nil,
+    :verbose => false,
+    :config_file  => nil,
+    :samples => nil,
+    :delay => 30,
+    :qsub_opts => ''
+  )
+end #set_default_options()
+
+# Just print the usage message
+def output_usage(out)
+  out.puts <<-EOF
+analyze_sequence_to_snps.rb -c PATH_TO_CONFIG.YML -o PATH_TO_BASE_OUTPUT_DIR SAMPLE_ID [SAMPLE_ID]
+
+Options
+-h, --help             Display this help message
+-v, --version          Display the version information
+-V, --verbose          Increased verbosity of output
+-d, --delay INT        Delay a random between 0 & INT before submitting job. Default 30 seonds
+-c, --config FILE      Specify the configuration yaml file of options for analysis
+-o, --output DIR       Specify the output directory prefix, all results will be saved under this directory
+-l, --local            Run the analyze script locally, not with initial SGE submit
+-q, --qsub OPTS        Additional options given to each qsub call
+  EOF
+end
+
+def output_version(out)
+  out.puts "#{File.basename(__FILE__)} Version: #{VERSION} Released: #{REVISION_DATE}"
+end
+
+def output_help(out)
+  output_version(out)
+  out.puts ""
+  output_usage(out)
+end
 
 end
 
 if $0 == __FILE__
-  exit(AnalysisTemplaterApp.new(ARGV.clone).run())
+exit(AnalysisTemplaterApp.new(ARGV.clone).run())
 end
 
 __END__
 <%=
-  bash_header()
+bash_header()
 %>
 
 # It is easier to use variables for thse paths
@@ -802,13 +816,13 @@ GATK_BASE=`dirname ${GATK_BIN}`"/.."
 SAMPLE="<%= @sample_name %>"
 
 <%=
-  fastq_file_list(@sample_name,@data)
+fastq_file_list(@sample_name,@data)
 %>
 
 function final_clean() {
-  rm -rf "$TMP_DIR"
+rm -rf "$TMP_DIR"
 }
-TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=/Volumes/hts_raw/scratch/fast_scratch`
+TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ <%= tmp_dir_base_opt() %>`
 trap final_clean EXIT
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
@@ -862,7 +876,7 @@ exit 0
 fi
 else
   rm -f finished.txt
-  TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=/Volumes/hts_raw/scratch/fast_scratch`
+  TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ <%= tmp_dir_base_opt() %>`
 fi #if 05_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
