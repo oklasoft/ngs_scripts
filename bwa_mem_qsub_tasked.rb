@@ -1,7 +1,10 @@
 #!/usr/bin/env ruby1.9
 
+require 'tmpdir'
+
 args = ARGV.clone
 # args.shift
+tmp_base = args.shift
 output_base = args.shift
 reference = args.shift
 index = (ENV['SGE_TASK_ID']||1).to_i - 1
@@ -30,15 +33,21 @@ tag = data[:tag]
 
 output = File.join(output_base,"#{index}.bam")
 
-cmd = "bwa mem -M -t #{threads} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}"
-cmd += "| picard SortSam TMP_DIR=./tmp VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 OUTPUT=#{output} SORT_ORDER=coordinate INPUT=/dev/stdin"
+return_val = -1
+Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
+cmd = "bwa mem -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}"
+#cmd += "| picard SortSam TMP_DIR=#{tmp_base} VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 OUTPUT=#{output} SORT_ORDER=coordinate INPUT=/dev/stdin"
+cmd += "|samtools view -Shu - | samtools sort -@ 2 -m 4G -p -o - #{tmp_prefix_dir}/#{index} > #{output}"
 
 puts cmd
 STDOUT.flush
 #STDOUT.reopen(File.open(output, 'w'))
 #exec cmd
 if system cmd
-  exit 0
+  return_val = 0
 else
-  exit $?
+  return_val = $?
 end
+end
+
+exit return_val

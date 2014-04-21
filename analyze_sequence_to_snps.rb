@@ -221,7 +221,7 @@ class AnalysisTemplate < Template
   end
 
   def bwa_alignment_command(sample_name,data)
-    cmd = "qsub #{qsub_opts()} -pe threaded 8 -l virtual_free=3G,mem_free=3G,h_vmem=32G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb 03_sorted_bams #{bwa_reference_for_data(data)}"
+    cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=3G,mem_free=3G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
     @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
       if data[index][:is_paired]
         cmd += " paired"
@@ -405,7 +405,7 @@ EOF
       fi
 
       export JAVA_MEM_OPTS="-Xmx24G"
-      qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=./tmp OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+      qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
       if [ "$?" -ne "0" ]; then
        echo -e "Failure joining reduced reads"
@@ -471,7 +471,7 @@ EOF
   def mark_dupes_or_skip(sample_name,data)
     if @default_config[:opts][:skip_dupes]
       <<-EOF
-qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=./tmp #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True USE_THREADING=True
+qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with merging the sams"
   exit 1
@@ -484,7 +484,7 @@ fi
   
   def mark_dupes(sample_name,data)
     <<-EOF
-qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=./tmp #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
+qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
 
 if [ "$?" -ne "0" ]; then
   echo -e "Failure with marking the duplicates"
@@ -805,8 +805,12 @@ SAMPLE="<%= @sample_name %>"
   fastq_file_list(@sample_name,@data)
 %>
 
-mkdir tmp
-export GATK_JAVA_OPTS="-Djava.io.tmpdir=./tmp"
+function final_clean() {
+  rm -rf "$TMP_DIR"
+}
+TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=/Volumes/hts_raw/scratch/fast_scratch`
+trap final_clean EXIT
+export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
 if [ ! -e 05_dup_marked/cleaned.bam ]; then
 # initial PCR clean by 'bins' via btangs
@@ -846,7 +850,7 @@ if [ "$PRE_GATK_ONLY" == "Y" ]; then
 rm -rf 00_inputs \
 01_bwa_aln_sai \
 02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
-tmp
+${TMP_DIR}
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
@@ -858,7 +862,7 @@ exit 0
 fi
 else
   rm -f finished.txt
-  mkdir tmp
+  TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=/Volumes/hts_raw/scratch/fast_scratch`
 fi #if 05_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
@@ -900,6 +904,6 @@ if [ "$PRE_GATK_ONLY" != "Y" ]; then
 fi
 
 rm -f qc/*.zip
-rm -rf tmp
+rm -rf ${TMP_DIR}
 
 touch finished.txt
