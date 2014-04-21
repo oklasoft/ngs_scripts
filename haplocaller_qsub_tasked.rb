@@ -4,6 +4,10 @@ require 'optparse'
 
 HUMAN_CHRS = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/
 
+MOUSE_CHRS = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 X Y M/.map{|c| "chr#{c}"}
+
+chromosomes = HUMAN_CHRS
+
 options = {:do_all => false, :memory => 16}
 optp = OptionParser.new
 optp.banner = "Usage: #{File.basename(__FILE__)} "
@@ -34,6 +38,12 @@ end
 
 optp.on("-m","--memory GB", Integer,"Override default GATK memory setting of (#{options[:memory]}) in GB") do |conf|
   options[:memory] = conf.to_i
+end
+
+optp.on("-g","--genome ORGANISM",%w/human mouse/,"Select a genome set of chromosomes") do |org|
+  if "mouse" == org
+    chromosomes = MOUSE_CHRS
+  end
 end
 
 optp.on("-h","--help") do
@@ -67,7 +77,7 @@ unless options[:do_all]
   rescue
   end
   index = (ENV['SGE_TASK_ID']).to_i - 1
-  chr = HUMAN_CHRS[index]
+  chr = chromosomes[index]
   options[:output_prefix] = File.join(options[:output_base],"by_chr","#{options[:output_prefix]}-#{chr}")
   cmd += ["-L",chr]
 else
