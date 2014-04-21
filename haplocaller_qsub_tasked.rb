@@ -52,7 +52,7 @@ optp.on("-h","--help") do
 end
 
 optp.parse!
-unless options[:output_base] && options[:output_prefix] && options[:input_bam] && options[:reference] && options[:dbsnp]
+unless options[:output_base] && options[:output_prefix] && options[:input_bam] && options[:reference]
   STDERR.puts optp.help()
   exit(1)
 end
@@ -67,8 +67,10 @@ cmd = %W/gatk -T HaplotypeCaller
          -R #{options[:reference]}
          -I #{options[:input_bam]}
          -variant_index_type LINEAR -variant_index_parameter 128000
-         -D #{options[:dbsnp]}
          /
+if options[:dbsnp] then
+  cmd += %W/-D #{options[:dbsnp]}/
+end
 
 unless options[:do_all]
   # we will do it by chr
