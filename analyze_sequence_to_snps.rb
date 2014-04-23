@@ -93,9 +93,9 @@ end
 def tmp_dir_base_opt()
   base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || nil
   if base
-    "--tmpdir \"#{base}\""
+    "`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=\"#{base}\"`"
   else
-    ""
+    "/tmp"
   end
 end
 
@@ -822,7 +822,11 @@ fastq_file_list(@sample_name,@data)
 function final_clean() {
 rm -rf "$TMP_DIR"
 }
-TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ <%= tmp_dir_base_opt() %>`
+TMP_DIR=<%= tmp_dir_base_opt() %>
+if [ "$?" -ne "0" ]; then
+  echo "Failed to make our temp work dir"
+  exit 1
+fi
 trap final_clean EXIT
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
@@ -876,7 +880,11 @@ exit 0
 fi
 else
   rm -f finished.txt
-  TMP_DIR=`mktemp -d --suffix=.${SAMPLE}.$$ <%= tmp_dir_base_opt() %>`
+  TMP_DIR=<%= tmp_dir_base_opt() %>
+if [ "$?" -ne "0" ]; then
+  echo "Failed to make our temp work dir"
+  exit 1
+fi
 fi #if 05_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
