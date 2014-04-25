@@ -241,15 +241,8 @@ def bwa_alignment_command(sample_name,data)
     # rg
     cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
 
-    # 01_bwa_aln_sai file(s)
-    #lane_shell_vars.each do |v|
-      ## cmd += " 01_bwa_aln_sai/#{@fastq_shell_vars[v][:base_file]}.sai"
-      #cmd += " 01_bwa_aln_sai/#{index}-#{@fastq_shell_vars[v][:paired]}.sai"
-    #end
-    # fastq file(s)
     lane_shell_vars.each do |v|
       cmd += " ${#{v}}"
-      #cmd += " 00_inputs/#{index}.bam"
     end
   end
   return cmd
