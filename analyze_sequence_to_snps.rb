@@ -367,7 +367,7 @@ def gvcf_by_chr(sample_name,data)
   mkdir 15_gvcf
   export JAVA_MEM_OPTS="-Xmx16G"
   qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gvcf_by_chr \\
-  -l virtual_free=3G,mem_free=3G,h_vmem=18G haplocaller_qsub_tasked.rb -r ${GATK_REF} <%= snprod %> \\
+  -l virtual_free=16G,mem_free=16G,h_vmem=20G haplocaller_qsub_tasked.rb -m 16 -r ${GATK_REF} <%= snprod %> \\
   -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
 
   if [ "$?" -ne "0" ]; then
