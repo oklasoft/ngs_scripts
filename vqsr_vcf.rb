@@ -135,10 +135,8 @@ def apply_recalibration(data,input_vcf,base_vcf_name)
   case @options.mode
   when /snp/i
     cmd += %w/--ts_filter_level 99.5/
-    cmd += %w/-mode SNP/
   when /indel/i
     cmd += %w/--ts_filter_level 99.0/
-    cmd += %w/-mode INDEL/
   end
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
