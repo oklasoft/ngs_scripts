@@ -112,8 +112,8 @@ end
 
 def variant_recalibrator(data,input_vcf,base_vcf_name)
   cmd = %w/gatk -T VariantRecalibrator -R/ + [@config[:gatk_ref]]
-  cmd += vqsr_training_data_gatk_opts(data) 
-  cmd += variant_recalibrator_extra_opts(data) 
+  cmd += vqsr_training_data_gatk_opts(data)
+  cmd += variant_recalibrator_extra_opts(data)
   cmd += ["-input", input_vcf]
   cmd += ["-recalFile", vqsr_output_file(base_vcf_name,"recal")]
   cmd += ["-tranchesFile", vqsr_output_file(base_vcf_name,"tranches")]
