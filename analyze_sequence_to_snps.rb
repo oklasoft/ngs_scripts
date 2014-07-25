@@ -91,7 +91,7 @@ def qsub_opts()
 end
 
 def tmp_dir_base_opt()
-  base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || nil
+  base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || "/tmp"
   if base
     "`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=\"#{base}\"`"
   else
@@ -594,7 +594,7 @@ def run_real
                        :gatk_ref => nil, :snp_rod => nil,
                        :opts=>{:skip_btangs => true, :skip_gvcf => false,
                          :skip_indel_realign => false,
-                         :reduce_reads=>false}
+                         :reduce_reads=>false, :tmp_dir_base => '/tmp'}
                      }]).first
 
   @default_config[:opts].merge!(:qsub_opts => @options.qsub_opts) if '' != @options.qsub_opts
