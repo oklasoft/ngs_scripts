@@ -450,7 +450,9 @@ def indel_realignment(sample_name,data)
   ERB.new(<<-EOF
     # Calculate intervals for realignment
     mkdir 06_intervals
-    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals -l virtual_free=1G,mem_free=1G,h_vmem=20G gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
+    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals \\
+     -l virtual_free=1G,mem_free=1G,h_vmem=20G \\
+     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure with target realigment creation"
@@ -460,7 +462,10 @@ def indel_realignment(sample_name,data)
     # Now realign & fix any mate info
     mkdir 07_realigned_bam
     unset JAVA_MEM_OPTS
-    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign -l virtual_free=5G,mem_free=4G,h_vmem=8G gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
+    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign \\
+     -l virtual_free=5G,mem_free=4G,h_vmem=8G \\
+     gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam \\
+     --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure with indel realigmnent"
@@ -488,7 +493,10 @@ end
 
 def mark_dupes(sample_name,data)
   <<-EOF
-qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
+qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups \\
+  picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} \\
+  OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt \\
+  VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 CREATE_INDEX=True
 
 if [ "$?" -ne "0" ]; then
 echo -e "Failure with marking the duplicates"
@@ -522,7 +530,10 @@ def covariate_recalibration(sample_name,data)
   # BaseRecalibrator
   mkdir 08_uncalibated_covariates
   unset JAVA_MEM_OPTS
-  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr -l virtual_free=1G,mem_free=4G,h_vmem=8G gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam -o ./08_uncalibated_covariates/recal_data.grp -nct 6
+  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr \\
+   -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
+   gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam \\
+   -o ./08_uncalibated_covariates/recal_data.grp -nct 6
 
   if [ "$?" -ne "0" ]; then
    echo -e "Failure counting covariates"
