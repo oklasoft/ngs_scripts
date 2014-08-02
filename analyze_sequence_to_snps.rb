@@ -445,7 +445,7 @@ def indel_realignment(sample_name,data)
   compression = if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
                   ""
                 else
-                  "--bam_compression 7"
+                  "--bam_compression 8"
                 end
   ERB.new(<<-EOF
     # Calculate intervals for realignment
@@ -473,7 +473,9 @@ end
 def mark_dupes_or_skip(sample_name,data)
   if @default_config[:opts][:skip_dupes]
     <<-EOF
-qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True
+qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge \\
+ picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam \\
+ VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True COMPRESSION_LEVEL=8
 if [ "$?" -ne "0" ]; then
 echo -e "Failure with merging the sams"
 exit 1
@@ -529,7 +531,10 @@ def covariate_recalibration(sample_name,data)
 
   mkdir 10_recalibrated_bam
   unset JAVA_MEM_OPTS
-  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate -l virtual_free=1G,mem_free=4G,h_vmem=8G gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 7 -nct 6
+  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate \\
+   -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
+   gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp \\
+   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6
 
   if [ "$?" -ne "0" ]; then
    echo -e "Failure reclibrating bam"
