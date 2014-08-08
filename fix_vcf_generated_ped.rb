@@ -75,13 +75,14 @@ class PedFixerApp
   REVISION_DATE = "20120328"
   AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
   COPYRIGHT     = "Copyright (c) 2011 Oklahoma Medical Research Foundation"
-  
+
   NUM_PEDIGREE_TEMPLATE_FIELDS = 7
-  
+
   NUM_PEDIGREE_FIELDS = 6
-  
-  PEDIGREE_FILE_DELIMITER = "\t"
-  
+
+  PEDIGREE_FILE_DELIMITER = /\s+/
+  OUTPUT_DELIMITER = ' '
+
   # Create an app object to run
   # * +args+ - Array of command line argument string
   # * +ios+ - Optional hash of :stdin, :stdout, :stderr to set to corresponding @std
@@ -220,7 +221,7 @@ class PedFixerApp
     orig_ped = line_parts.shift(NUM_PEDIGREE_FIELDS)
     ped = @ped_template[orig_ped[0]] || orig_ped
     @individuals_not_seen.delete(orig_ped[0])
-    (ped + line_parts).join(PEDIGREE_FILE_DELIMITER)
+    (ped + line_parts).join(OUTPUT_DELIMITER)
   end #fixed_line(line)
 
   # Setup the streams to use for stdin, out & error
@@ -231,7 +232,7 @@ class PedFixerApp
     @stdout = ios[:stdout] || STDOUT
     @stderr = ios[:stderr] || STDERR
   end
-  
+
   # Just make sure the app is happy with some steady & known default options
   # build the @options hash
   def set_default_options()
@@ -245,7 +246,7 @@ class PedFixerApp
       :input_files => [@stdin]
     )
   end #set_default_options
-  
+
   # Do the work of parsing out the options in the @arg array into the right
   # places into the @options
   # ==== Retuns
@@ -258,7 +259,7 @@ class PedFixerApp
       opts.on('-V', '--verbose')    { @options.verbose = true }
 
       opts.on('-a', '--add_individuals')    { @options.add_individuals = true }
-      
+
       opts.on("-t","--template", "=REQUIRED") do |template_file|
         @options.template_file = template_file
       end
@@ -266,25 +267,25 @@ class PedFixerApp
       opts.on("-p","--prefix", "=REQUIRED") do |prefix|
         @options.prefix = prefix
       end
-      
+
       opts.on("-i","--inplace [EXTENSION]") do |ext|
         @options.save_inplace  = true
         @options.backup_extension = ext || nil
         @options.backup_extension.sub!(/\A\.?(?=.)/, ".") if @options.backup_extension
       end
     end
-    
+
     opts.parse!(@args) #rescue return false
     @options.input_files = @args unless @args.empty?
     return true
   end #options_parsed?
-  
+
   # Make sure the options we have are correct & valid
   def options_valid?
     template_valid?() &&
     output_options_valid?()
   end #options_valid?
-  
+
   # Test the input template by checking it is readable & contains the valid 7 
   # columns
   def template_valid?()
@@ -305,7 +306,7 @@ class PedFixerApp
     @stderr.puts "Pedigree Template file '#{@options.template_file}' is not valid: #{msg}"
     return false
   end #template_valid?()
-  
+
   # Given an input get what its output should be based on the output opts
   # * +input+ - Input object, either file path, or maybe it is is @stdin
   # ==== Returns
@@ -325,7 +326,7 @@ class PedFixerApp
       return @stdout
     end
   end #output_for_input()
-  
+
   # Get the path for the resulting output file using a prefix
   # * +input+ - the input pedigree file path
   # * Will use the @options.prefix to make the new file path
@@ -333,7 +334,7 @@ class PedFixerApp
     parts = base_dir_and_file_of(input)
     return File.join(parts.first,"#{@options.prefix}_#{parts.last}")
   end #output_for_input_using_prefix(input)
-  
+
   # Get an output file using inplace replacement
   # * +input+ - input file path
   # * Will use the @options.backup_extension to make the new file path
@@ -343,12 +344,12 @@ class PedFixerApp
     end
     return Tempfile.new('fix_vcf_generated_ped')
   end #output_for_input_using_inplace(input)
-  
+
   # Get the base folder of the file
   def base_dir_and_file_of(input)
     [File.dirname(input),File.basename(input)]
   end #base_of(input)
-  
+
   # Test the options given for output
   # * Either prefix, inplace, or neither
   # * Prefix requires input file(s), not STDIN
@@ -358,23 +359,23 @@ class PedFixerApp
   def output_options_valid?()
     if @options.prefix && @options.save_inplace then
       @stderr.puts "Selected output options are not valid, you can't have a prefix and save in place"
-      return false      
+      return false
     end
-    
+
     if input_is_stdin?() && (@options.prefix || @options.save_inplace)
       @stderr.puts "Selected output options are not valid, you can't use STDIN with a prefix or saving inplace"
-      return false      
+      return false
     end
-    
+
     if !(@options.prefix) && !(@options.save_inplace) && @options.input_files.size > 1 then
       @stderr.puts "Multiple inputs cannot go to STDOUT"
       return false
     end
-    
+
     # by this point we either STDIN only, or Files with options that are valid
     return true
   end #output_options_valid
-  
+
   # Test to see if the output path is valid
   def output_is_valid?(output)
     @stderr.puts "Testing #{output}" if @options.verbose 
@@ -390,12 +391,12 @@ class PedFixerApp
     end
     return false
   end #output_is_valid?(output)
-  
+
   # Test if we are just doing STDING
   def input_is_stdin?()
     1 == @options.input_files.size && @stdin == @options.input_files[0]
   end #input_is_stdin?()
-  
+
   # Just print the usage message
   def output_usage(out)
     out.puts <<-EOF
@@ -410,22 +411,22 @@ Options:
  -p, --prefix STR       Specify the prefix the output file(s)
  -i, --inplace EXT      Save new file in place, saving original files with given extension.
                         Note original is not saved if no extension is given with -i option
-                        
+
  Either use the prefix or inplace option for the new file, but not both
-    
+
     EOF
   end
 
   def output_version(out)
     out.puts "#{File.basename(__FILE__)} Version: #{VERSION} Released: #{REVISION_DATE}"
   end
-  
+
   def output_help(out)
     output_version(out)
     out.puts ""
     output_usage(out)
   end
-  
+
 end #PedFixerApp
 
 
