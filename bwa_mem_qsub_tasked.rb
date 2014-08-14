@@ -21,9 +21,9 @@ while a = args.shift
   end
   data[:tag] = args.shift
   data[:inputs] = ["#{args.shift}"]
-  
+
   data[:inputs] << ["#{args.shift}"] if "paired" == data[:mode]
-  
+
   groups << data
 end
 
@@ -35,19 +35,16 @@ output = File.join(output_base,"#{index}.bam")
 
 return_val = -1
 Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
-cmd = "bwa mem -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}"
-#cmd += "| picard SortSam TMP_DIR=#{tmp_base} VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 OUTPUT=#{output} SORT_ORDER=coordinate INPUT=/dev/stdin"
-cmd += "|samtools view -Shu - | samtools sort -@ 2 -m 4G -p -o - #{tmp_prefix_dir}/#{index} > #{output}"
+  cmd = "bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}"
+  cmd += "|samtools view -Shu - | samtools sort -@ 2 -m 4G -o - #{tmp_prefix_dir}/#{index} > #{output}"
 
-puts cmd
-STDOUT.flush
-#STDOUT.reopen(File.open(output, 'w'))
-#exec cmd
-if system cmd
-  return_val = 0
-else
-  return_val = $?
-end
+  puts cmd
+  STDOUT.flush
+  if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+    return_val = 0
+  else
+    return_val = $?.exitstatus
+  end
 end
 
 exit return_val
