@@ -230,7 +230,9 @@ def bwa_reference_for_data(data)
 end
 
 def bwa_alignment_command(sample_name,data)
-  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
+  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
+  cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment"
+  cmd += " bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
       cmd += " paired"
@@ -251,14 +253,6 @@ end
 def extract_unaligned(sample_name,data)
 
 end
-
-def default_rg(sample_name,data)
-  return ""
-  return "" if data.first[:is_paired]
-  data = data.first
-  "--default_read_group #{sample_name}_#{data[:run]}_s_#{data[:lane]} --default_platform Illumina"
-end
-
 
 def input_sam_bam_files(prefix,suffix)
   cmd = ""
@@ -289,7 +283,7 @@ def clean_commands(sample_name,data)
   if [ "$?" -ne "0" ]; then
     echo -e "Failure with btang cleaning"
     exit 1
-  fi 
+  fi
 
 EOF
 end
@@ -333,7 +327,7 @@ def variant_call(sample_name,data)
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
     -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
     -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
-    # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %> 
+    # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %>
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure GVCF"
@@ -481,9 +475,10 @@ def mark_dupes_or_skip(sample_name,data)
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge \\
  picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam \\
  VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True COMPRESSION_LEVEL=8
+
 if [ "$?" -ne "0" ]; then
-echo -e "Failure with merging the sams"
-exit 1
+  echo -e "Failure with merging the sams"
+  exit 1
 fi
     EOF
   else
@@ -649,7 +644,7 @@ def process_sample(sample_name)
   end
 
   if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
-    extract_script_file = File.join(output_dir,"extract_unaligned.sh") 
+    extract_script_file = File.join(output_dir,"extract_unaligned.sh")
     File.open(extract_script_file,"w") do |f|
       f.puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
     end
@@ -700,8 +695,8 @@ def options_parsed?
       @options.qsub_opts = qopts
    end
 
-    o.on("-t","--tmp", "=REQUIRED") do |opts|
-      @options.tmp_dir_base = opts
+    o.on("-t","--tmp", "=REQUIRED") do |topts|
+      @options.tmp_dir_base = topts
     end
   end
 
@@ -869,7 +864,7 @@ fi
 mkdir 05_dup_marked
 <%= mark_dupes_or_skip(@sample_name,@data) %>
 
-<%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %> 
+<%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %>
 
 
 # TODO stop here if pre_gatk only
@@ -914,7 +909,7 @@ rm -rf 00_inputs \
 07_realigned_bam \
 08_uncalibated_covariates \
 10_recalibrated_bam \
-11_calibated_covariates 
+11_calibated_covariates
 
 <%= reduce_reads(@sample_name,@data) %>
 
