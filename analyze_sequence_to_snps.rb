@@ -306,6 +306,16 @@ def opt_l_interval(data)
   end
 end
 
+def alignment_summary(sample_name,data)
+  bam_dir = unless @default_config[:opts][:reduce_reads]
+              "13_final_bam"
+            else
+              "14_reduced_bam"
+            end
+  cmd="JAVA_MEM_OPTS=\"-Xmx4G\" qsub #{qsub_opts()} -l virtual_free=2G,mem_free=2G,h_vmem=6G -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_alignment_summary \\\n"
+  cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
+  return cmd
+end
 
 def variant_call(sample_name,data)
   bam_dir = ''
@@ -912,6 +922,9 @@ rm -rf 00_inputs \
 11_calibated_covariates
 
 <%= reduce_reads(@sample_name,@data) %>
+
+# Get some summary stats on the alignment off in the background
+<%= alignment_summary(@sample_name,@data) %>
 
 <%= variant_call(@sample_name,@data) %>
 
