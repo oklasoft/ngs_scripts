@@ -132,7 +132,7 @@ class UnalignedExtractTemplate < Template
 
 def bam_to_fastq_for_run(run,bam_index)
   cmd = "bam2fastq --no-aligned --unaligned -o unaligned_fastq/#{@sample_name}_unaligned_#{run[:run]}_#{run[:lane]}\#_sequence.txt 03_first_bam/#{bam_index}.bam"
-  cmd = "qsub #{qsub_opts} -o logs -b y -j y -cwd -V -q ngs.q -l h_vmem=8G -sync y -N a_#{@sample_name}_unaligned_#{bam_index} #{cmd}"
+  cmd = "qsub #{qsub_opts} -o logs -b y -j y -cwd -V -l h_vmem=8G -sync y -N a_#{@sample_name}_unaligned_#{bam_index} #{cmd}"
   return cmd
 end
 
@@ -150,7 +150,7 @@ echo -e "Failure extracting unalinged from bam <%= i %>"
 exit 1
 fi
 <% end %>
-qsub <%= qsub_opts() %> -o logs -b y -V -j y -cwd -q ngs.q -sync y -N a_<%=@sample_name%>_unaligned_gzip gzip -7 unaligned_fastq/*_sequence.txt
+qsub <%= qsub_opts() %> -o logs -b y -V -j y -cwd -sync y -N a_<%=@sample_name%>_unaligned_gzip gzip -7 unaligned_fastq/*_sequence.txt
 
 rm -rf 03_first_bam
   EOS
@@ -199,11 +199,10 @@ end
 
 def cleanup_cleaned_fastq_files(sample_name)
   return "echo noop" if @default_config[:opts][:skip_btangs]
-  #qsub -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gzip_1 gzip --fast ${FASTQ1}
   cmds = []
   @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
     cmds << "rm -f ${#{input}}"
-    cmds << "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_gzip_#{i}_rejects gzip -9 #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
+    cmds << "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -N a_#{sample_name}_gzip_#{i}_rejects gzip -9 #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
   end
   cmds.join("\n")
 end
@@ -231,7 +230,7 @@ end
 
 def bwa_alignment_command(sample_name,data)
   cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
-  cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_bwa_alignment"
+  cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
   cmd += " bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
@@ -276,7 +275,7 @@ def clean_commands(sample_name,data)
       cmd += " --single-end"
     end
     cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-    cleans << "qsub #{qsub_opts()} -pe threaded 2 -l hadoop=1,h_vmem=4G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
+    cleans << "qsub #{qsub_opts()} -pe threaded 2 -l hadoop=1,h_vmem=4G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
   end
   cleans.join("\n") + <<-EOF
 
@@ -312,7 +311,7 @@ def alignment_summary(sample_name,data)
             else
               "14_reduced_bam"
             end
-  cmd="JAVA_MEM_OPTS=\"-Xmx4G\" qsub #{qsub_opts()} -l virtual_free=2G,mem_free=2G,h_vmem=6G -o logs -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_alignment_summary \\\n"
+  cmd="JAVA_MEM_OPTS=\"-Xmx4G\" qsub #{qsub_opts()} -l virtual_free=2G,mem_free=2G,h_vmem=6G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
   return cmd
 end
@@ -332,7 +331,7 @@ def variant_call(sample_name,data)
     # Finally Haplotypecaller in gVCF mode or is Gvcf mode
 
     export JAVA_MEM_OPTS="-Xmx24G"
-    qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_variants \\
+    qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
     -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
@@ -370,7 +369,7 @@ def gvcf_by_chr(sample_name,data)
   # GVCF by chr for better/faster/stronger
   mkdir 15_gvcf
   export JAVA_MEM_OPTS="-Xmx16G"
-  qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_gvcf_by_chr \\
+  qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
   -l virtual_free=16G,mem_free=16G,h_vmem=20G haplocaller_qsub_tasked.rb -m 16 -r ${GATK_REF} <%= snprod %> \\
   -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
 
@@ -380,7 +379,7 @@ def gvcf_by_chr(sample_name,data)
   fi
 
   export JAVA_MEM_OPTS="-Xmx24G"
-  qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_gvcf \\
+  qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_gvcf \\
   -l virtual_free=20G,mem_free=20G,h_vmem=30G gatk -T CombineGVCFs -R ${GATK_REF} \\
   <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.gvcf
 
@@ -403,7 +402,7 @@ def reduce_reads(sample_name,data)
     # Make a reduce reads BAM for variant calling better/faster/stronger
     mkdir 14_reduced_bam
     export JAVA_MEM_OPTS="-Xmx16G"
-    qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_reduce_reads -l virtual_free=8G,mem_free=12G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
+    qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_reduce_reads -l virtual_free=8G,mem_free=12G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure reducing reads"
@@ -411,7 +410,7 @@ def reduce_reads(sample_name,data)
     fi
 
     export JAVA_MEM_OPTS="-Xmx24G"
-    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure joining reduced reads"
@@ -454,7 +453,7 @@ def indel_realignment(sample_name,data)
   ERB.new(<<-EOF
     # Calculate intervals for realignment
     mkdir 06_intervals
-    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_intervals \\
+    qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_intervals \\
      -l virtual_free=1G,mem_free=1G,h_vmem=20G \\
      gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
 
@@ -466,7 +465,7 @@ def indel_realignment(sample_name,data)
     # Now realign & fix any mate info
     mkdir 07_realigned_bam
     unset JAVA_MEM_OPTS
-    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_realign \\
+    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_realign \\
      -l virtual_free=5G,mem_free=4G,h_vmem=8G \\
      gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam \\
      --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
@@ -482,7 +481,7 @@ end
 def mark_dupes_or_skip(sample_name,data)
   if @default_config[:opts][:skip_dupes]
     <<-EOF
-qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge \\
+qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_merge \\
  picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam \\
  VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True COMPRESSION_LEVEL=8
 
@@ -498,7 +497,7 @@ end
 
 def mark_dupes(sample_name,data)
   <<-EOF
-qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_#{sample_name}_merge_mark_dups \\
+qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_merge_mark_dups \\
   picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} \\
   OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt \\
   VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True COMPRESSION_LEVEL=8
@@ -535,7 +534,7 @@ def covariate_recalibration(sample_name,data)
   # BaseRecalibrator
   mkdir 08_uncalibated_covariates
   unset JAVA_MEM_OPTS
-  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_bqsr \\
+  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_bqsr \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam \\
    -o ./08_uncalibated_covariates/recal_data.grp -nct 6
@@ -547,7 +546,7 @@ def covariate_recalibration(sample_name,data)
 
   mkdir 10_recalibrated_bam
   unset JAVA_MEM_OPTS
-  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -q ngs.q -N a_<%= sample_name %>_recalibrate \\
+  qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_recalibrate \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp \\
    -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6
@@ -670,7 +669,7 @@ def process_sample(sample_name)
 
   # We sleep a random amount to avoid overloading SGE with a billion jobs right away
   sleep(rand(@options.delay))
-  cmd = %W(qsub) + @options.qsub_opts.split(/ /) + %W(-o logs -sync y -b y -V -j y -cwd -q ngs.q -m e -N a_#{sample_name}_full ./analyze.sh)
+  cmd = %W(qsub) + @options.qsub_opts.split(/ /) + %W(-o logs -sync y -b y -V -j y -cwd -m e -N a_#{sample_name}_full ./analyze.sh)
   cmd = %w(./analyze.sh) if @options.run_local
   @stdout.puts(cmd.join(" "))
   system(*cmd)
@@ -852,7 +851,7 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 
 # fastqc info
 #mkdir qc
-#qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
+#qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
 # setup input sams, will get illumina scores to standard sanger
 export JAVA_MEM_OPTS="-Xmx16G"
@@ -907,7 +906,7 @@ fi #if 05_dup_marked/cleaned.bam already existed
 <%= covariate_or_final(@sample_name,@data) %>
 
 # fastqc info
-#qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -q ngs.q -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
+#qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
 
 # Clean up after ourselves
@@ -930,7 +929,7 @@ rm -rf 00_inputs \
 
 <%=
   if (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) then
-    cmd = "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -q ngs.q -m e -N a_#{@sample_name}_unaligned_extract ./extract_unaligned.sh"
+    cmd = "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -m e -N a_#{@sample_name}_unaligned_extract ./extract_unaligned.sh"
     cmd
   end
 %>
