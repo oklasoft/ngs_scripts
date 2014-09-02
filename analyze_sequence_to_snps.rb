@@ -117,7 +117,7 @@ module unload tabix
 module unload btags
 module load bwa/0.7.10
 module load samtools/0.1.19
-module load picard/1.99
+module load picard/1.118
 module load gatk/3.2-2
 module load fastqc/0.10.1
 module load tabix/0.2.6
