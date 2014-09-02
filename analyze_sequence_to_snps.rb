@@ -311,7 +311,7 @@ def alignment_summary(sample_name,data)
             else
               "14_reduced_bam"
             end
-  cmd="JAVA_MEM_OPTS=\"-Xmx4G\" qsub #{qsub_opts()} -l virtual_free=2G,mem_free=2G,h_vmem=6G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
+  cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
   return cmd
 end
