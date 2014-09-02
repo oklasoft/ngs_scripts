@@ -253,7 +253,7 @@ class PedFixerApp
   # * +true+ - For good option parsing
   # * +false+ - On errors during parsing
   def options_parsed?
-    opts = OptionParser.new() do |opts|
+    optsp = OptionParser.new() do |opts|
       opts.on('-v','--version') { output_version(@stdout); exit(0) }
       opts.on('-h','--help') { output_help(@stdout); exit(0) }
       opts.on('-V', '--verbose')    { @options.verbose = true }
@@ -275,7 +275,7 @@ class PedFixerApp
       end
     end
 
-    opts.parse!(@args) #rescue return false
+    optsp.parse!(@args) #rescue return false
     @options.input_files = @args unless @args.empty?
     return true
   end #options_parsed?
