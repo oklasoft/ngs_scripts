@@ -212,7 +212,7 @@ class PedFixerApp
     genos = ["0"] * num_markers * 2
     @individuals_not_seen.each do |id|
       ped = @ped_template[id]
-      output.puts (ped + genos).join(PEDIGREE_FILE_DELIMITER)
+      output.puts (ped + genos).join(OUTPUT_DELIMITER)
     end
   end #add_missing_individuals(output)
 
