@@ -607,6 +607,36 @@ def script_template()
   return DATA.read
 end
 
+def path_variables()
+  ERB.new(<<-EOF
+GATK_BIN=`which gatk`
+GATK_BASE=`dirname ${GATK_BIN}`"/.."
+EOF
+).result(binding)
+end
+
+end
+
+class DNAAnalysisTemplate < AnalysisTemplate
+def path_variables()
+  super() + 
+  ERB.new(<<-EOF
+GATK_REF=<%= @data.first[:gatk_ref] || @default_config[:gatk_ref] %>
+GATK_DBSNP=<%= @data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
+EOF
+).result(binding)
+end
+end
+
+class RNAAnalysisTemplate < AnalysisTemplate
+def path_variables()
+  super() + 
+  ERB.new(<<-EOF
+STAR_REF=<%= @data.first[:star_ref] || @default_config[:star_ref] %>
+STAR_INDEX=<%= @data.first[:star_index] || @default_config[:star_index] %>
+EOF
+).result(binding)
+end
 end
 
 
@@ -870,10 +900,7 @@ bash_header()
 %>
 
 # It is easier to use variables for thse paths
-GATK_REF=<%= @data.first[:gatk_ref] || @default_config[:gatk_ref] %>
-GATK_DBSNP=<%= @data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
-GATK_BIN=`which gatk`
-GATK_BASE=`dirname ${GATK_BIN}`"/.."
+<%= path_variables() %>
 
 SAMPLE="<%= @sample_name %>"
 
