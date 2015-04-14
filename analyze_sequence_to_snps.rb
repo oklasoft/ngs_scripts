@@ -100,13 +100,26 @@ def tmp_dir_base_opt()
 end
 
 def mode()
-  case @data.first[:mode]
+  self.class.which_mode(@data.first[:mode])
+end
+
+def self.which_mode(mode)
+  case mode
   when /\Adna\z/i
     :dna
   when /\Arna\z/i
     :rna
   else
     raise "Unknown mode '#{data.first[:mode]}' for #{@sample_name}"
+  end
+end
+
+def self.analysis_template(default_config,sample_name,data)
+  case which_mode(data.first[:mode])
+  when :dna
+    DNAAnalysisTemplate.new(default_config,sample_name,data)
+  when :rna
+    RNAAnalysisTemplate.new(default_config,sample_name,data)
   end
 end
 
@@ -670,7 +683,7 @@ def process_sample(sample_name)
     puts data.inspect
     puts ""
     #exit 0
-    puts AnalysisTemplate.new(@default_config,sample_name,data)
+    puts Template.analysis_template(@default_config,sample_name,data)
     if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
       puts UnalignedExtractTemplate.new(@default_config,sample_name,data)
     end
@@ -685,7 +698,7 @@ def process_sample(sample_name)
 
   script_file = File.join(output_dir,"analyze.sh")
   File.open(script_file,"w") do |f|
-    f.puts AnalysisTemplate.new(@default_config,sample_name,data)
+    f.puts Template.analysis_template(@default_config,sample_name,data)
   end
 
   if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
