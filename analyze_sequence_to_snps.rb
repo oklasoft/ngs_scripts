@@ -631,9 +631,25 @@ def process_sample(sample_name)
   data = @config[sample_name]
   data.each_with_index do |d,i|
     data[i] = @default_config.merge(d)
+    case data[i][:mode]
+    when /\ADNA\z/i
+      if data[i][:bwa_ref] == nil 
+        @stderr.puts "Missing bwa reference for #{sample_name}"
+        return 1
+      end
+    when /\Arna\z/i
+      if data[i][:star_ref] == nil || data[i][:star_index] == nil
+        @stderr.puts "Missing star reference for #{sample_name}"
+        return 1
+      end
+    when default
+      @stderr.puts "Missing analysis mode for #{sample_name}"
+      return 1
+    end
   end
   if @options.debug
     puts data.inspect
+    puts ""
     #exit 0
     puts AnalysisTemplate.new(@default_config,sample_name,data)
     if (data.first.has_key?(:keep_unaligned) && data.first[:keep_unaligned]) then
