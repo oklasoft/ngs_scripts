@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 #
 # analyze_sequence_to_snps.rb
 # Created by Stuart Glenn on 2010-12-22
