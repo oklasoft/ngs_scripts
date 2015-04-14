@@ -100,13 +100,22 @@ def tmp_dir_base_opt()
 end
 
 def mode()
-  case data.first[:mode]
+  case @data.first[:mode]
   when /\Adna\z/i
     :dna
   when /\Arna\z/i
     :rna
   else
     raise "Unknown mode '#{data.first[:mode]}' for #{@sample_name}"
+  end
+end
+
+def aligner_unload_load()
+  case mode()
+  when :dna
+    "module unload bwa\nmodule load bwa/0.7.10"
+  when :rna
+    "module unload star\nmodule load star/2.4.0h"
   end
 end
 
@@ -119,14 +128,13 @@ cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # be sure to start with a fresh & known enviroment (hopefully)
 . /usr/local/Modules/default/init/bash
-module unload bwa
 module unload samtools
 module unload picard
 module unload gatk
 module unload fastqc
 module unload tabix
 module unload btags
-module load bwa/0.7.10
+#{aligner_unload_load()}
 module load samtools/0.1.19
 module load picard/1.118
 module load gatk/3.2-2
