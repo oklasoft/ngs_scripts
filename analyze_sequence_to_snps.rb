@@ -36,7 +36,7 @@
 # Stuart Glenn <Stuart-Glenn@omrf.org>
 #
 # ==Copyright
-#  Copyright (c) 2011-2014 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
+#  Copyright (c) 2011-2015 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
 #  All rights reserved.
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions are met:
@@ -582,7 +582,7 @@ class AnalysisTemplaterApp
 VERSION       = "3.2.0"
 REVISION_DATE = "20140717"
 AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
-COPYRIGHT     = "Copyright (c) 2012-2014 Oklahoma Medical Research Foundation"
+COPYRIGHT     = "Copyright (c) 2012-2015 Oklahoma Medical Research Foundation"
 
 # Set up the app to roun
 # *+args+ - command line ARGS formatted type array
