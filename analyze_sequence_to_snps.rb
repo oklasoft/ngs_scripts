@@ -611,8 +611,8 @@ private
 # Do the work of running this app
 def run_real
   @default_config = (@config["DEFAULT"] || [
-                     {:run => nil, :lane => nil, :bwa_ref => nil,
-                       :gatk_ref => nil, :snp_rod => nil,
+                     {:run => nil, :lane => nil, :bwa_ref => nil, :star_ref => nil, :star_gtf => nil, :star_index => nil,
+                       :gatk_ref => nil, :snp_rod => nil, :mode => nil,
                        :opts=>{:skip_btangs => true, :skip_gvcf => false,
                          :skip_indel_realign => false,
                          :reduce_reads=>false}
