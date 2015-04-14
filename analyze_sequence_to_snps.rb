@@ -75,7 +75,7 @@ class Template
 # Create instance
 # *+default_config+ - Default options
 # *+sample_name+ - Name of this sample
-# *+data+ - Hash of options for this sample, overrides anything in default_config
+# *+data+ - Array of hashes of options for this sample, overrides anything in default_config, each is a library run
 def initialize(default_config,sample_name,data)
   @default_config = default_config
   @sample_name = sample_name
@@ -96,6 +96,17 @@ def tmp_dir_base_opt()
     "`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=\"#{base}\"`"
   else
     "/tmp"
+  end
+end
+
+def mode()
+  case data.first[:mode]
+  when /\Adna\z/i
+    :dna
+  when /\Arna\z/i
+    :rna
+  else
+    raise "Unknown mode '#{data.first[:mode]}' for #{@sample_name}"
   end
 end
 
@@ -642,7 +653,7 @@ def process_sample(sample_name)
         @stderr.puts "Missing star reference for #{sample_name}"
         return 1
       end
-    when default
+    else
       @stderr.puts "Missing analysis mode for #{sample_name}"
       return 1
     end
