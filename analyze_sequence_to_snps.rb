@@ -256,29 +256,11 @@ def link_fastq_inputs()
   lines.join("\n")
 end
 
-def bwa_reference_for_data(data)
+def reference_for_data(data)
   data.first[:bwa_ref] || @default_config[:bwa_ref]
 end
 
-def bwa_alignment_command(sample_name,data)
-  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
-  cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
-  cmd += " bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{bwa_reference_for_data(data)}"
-  @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
-    if data[index][:is_paired]
-      cmd += " paired"
-    else
-      cmd += " single"
-    end
-
-    # rg
-    cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
-
-    lane_shell_vars.each do |v|
-      cmd += " ${#{v}}"
-    end
-  end
-  return cmd
+def alignment_command(sample_name,data)
 end
 
 def extract_unaligned(sample_name,data)
@@ -297,7 +279,7 @@ end
 def clean_commands(sample_name,data)
   return if @default_config[:opts][:skip_btangs]
   #clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
-  cleans = []
+  cleans = ["# initial PCR clean by 'bins' via btangs"]
   data.each_with_index do |sequence,s_i|
     cmd = "clean_sample.rb -s #{sample_name} -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
     if sequence[:trim_end]
@@ -618,6 +600,7 @@ end
 end
 
 class DNAAnalysisTemplate < AnalysisTemplate
+
 def path_variables()
   super() + 
   ERB.new(<<-EOF
@@ -626,9 +609,36 @@ GATK_DBSNP=<%= @data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
 EOF
 ).result(binding)
 end
+
+def reference_for_data(data)
+  data.first[:bwa_ref] || @default_config[:bwa_ref]
+end
+
+def alignment_command(sample_name,data)
+  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
+  cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
+  cmd += " bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{reference_for_data(data)}"
+  @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
+    if data[index][:is_paired]
+      cmd += " paired"
+    else
+      cmd += " single"
+    end
+
+    # rg
+    cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
+
+    lane_shell_vars.each do |v|
+      cmd += " ${#{v}}"
+    end
+  end
+  return cmd
+end
+
 end
 
 class RNAAnalysisTemplate < AnalysisTemplate
+
 def path_variables()
   super() + 
   ERB.new(<<-EOF
@@ -920,7 +930,6 @@ trap final_clean EXIT
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
 if [ ! -e 05_dup_marked/cleaned.bam ]; then
-# initial PCR clean by 'bins' via btangs
 <%=
   clean_commands(@sample_name,@data)
 %>
@@ -929,13 +938,12 @@ if [ ! -e 05_dup_marked/cleaned.bam ]; then
 mkdir qc
 qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
 
-# setup input sams, will get illumina scores to standard sanger
 export JAVA_MEM_OPTS="-Xmx16G"
 
 # Now take those & actually generate the alignment SAM output, paired or single
 mkdir 03_sorted_bams
 <%=
-  bwa_alignment_command(@sample_name,@data)
+  alignment_command(@sample_name,@data)
 %>
 
 if [ "$?" -ne "0" ]; then
