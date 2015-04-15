@@ -643,10 +643,45 @@ def path_variables()
   super() + 
   ERB.new(<<-EOF
 STAR_REF=<%= @data.first[:star_ref] || @default_config[:star_ref] %>
-STAR_INDEX=<%= @data.first[:star_index] || @default_config[:star_index] %>
+STAR_INDEX=<%= star_index() %>
 EOF
 ).result(binding)
 end
+
+def star_index()
+  @data.first[:star_index] || @default_config[:star_index]
+end
+
+def star_gtf()
+  @data.first[:star_gtf] || @default_config[:star_gtf]
+end
+
+def alignment_command(sample_name,data)
+  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y \\\n"
+  cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_star_alignment \\\n"
+  cmd += " star_qsub_tasked.rb -t ${TMP_DIR} -o 03_sorted_bams -i ${STAR_INDEX} -r ${STAR_REF}"
+  cmd += " -g #{star_gtf()}" if star_gtf()
+  @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
+    cmd += " \\\n"
+    if data[index][:is_paired]
+      cmd += " paired"
+    else
+      cmd += " single"
+    end
+
+    cmd += " \\\n"
+    # rg
+    cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
+
+    cmd += " \\\n"
+
+    lane_shell_vars.each do |v|
+      cmd += " ${#{v}}"
+    end
+  end
+  return cmd
+end
+
 end
 
 
