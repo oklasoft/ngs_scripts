@@ -68,6 +68,7 @@ require 'yaml'
 require 'erb'
 require 'optparse'
 require 'ostruct'
+require 'json'
 
 
 class Template
@@ -661,24 +662,19 @@ def alignment_command(sample_name,data)
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_star_alignment \\\n"
   cmd += " star_qsub_tasked.rb -t ${TMP_DIR} -o 03_sorted_bams -i ${STAR_INDEX} -r ${STAR_REF}"
   cmd += " -g #{star_gtf()}" if star_gtf()
+  libs = []
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
-    cmd += " \\\n"
-    if data[index][:is_paired]
-      cmd += " paired"
-    else
-      cmd += " single"
-    end
-
-    cmd += " \\\n"
-    # rg
-    cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
-
-    cmd += " \\\n"
-
-    lane_shell_vars.each do |v|
-      cmd += " ${#{v}}"
-    end
+    libs <<  {
+      :paths => lane_shell_vars.map{|v| @fastq_shell_vars[v][:path]},
+      :rg => {
+      :id => "#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}",
+      :sm => sample_name,
+      :pl => "Illumina",
+      :pu => data[index][:lane],
+    }}
   end
+  j = libs.to_json.gsub(/"/,'\\"')
+  cmd += " \\\n \\'#{j}\\'"
   return cmd
 end
 
