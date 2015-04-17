@@ -668,6 +668,7 @@ def alignment_command(sample_name,data)
       :paths => lane_shell_vars.map{|v| @fastq_shell_vars[v][:path]},
       :rg => {
       :id => "#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}",
+      :lb => "#{sample_name}_#{data[index][:run]}",
       :sm => sample_name,
       :pl => "Illumina",
       :pu => data[index][:lane],
