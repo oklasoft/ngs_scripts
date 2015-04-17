@@ -979,7 +979,7 @@ mkdir 03_sorted_bams
 %>
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure with bwa alignment"
+  echo -e "Failure with alignment"
   exit 1
 fi
 
