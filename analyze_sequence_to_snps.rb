@@ -453,7 +453,7 @@ end
 def indel_realign(sample_name,data)
   if @default_config[:opts][:skip_indel_realign]
     return <<-EOF
-      ln -s 05_dup_marked 07_realigned_bam
+      ln -s 04_dup_marked 07_realigned_bam
     EOF
   else
     indel_realignment(sample_name,data)
@@ -471,7 +471,7 @@ def indel_realignment(sample_name,data)
     mkdir 06_intervals
     qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_intervals \\
      -l virtual_free=1G,mem_free=1G,h_vmem=20G \\
-     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
+     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./04_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure with target realigment creation"
@@ -483,7 +483,7 @@ def indel_realignment(sample_name,data)
     unset JAVA_MEM_OPTS
     qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_realign \\
      -l virtual_free=5G,mem_free=4G,h_vmem=8G \\
-     gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./05_dup_marked/cleaned.bam \\
+     gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./04_dup_marked/cleaned.bam \\
      --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
 
     if [ "$?" -ne "0" ]; then
@@ -498,7 +498,7 @@ def mark_dupes_or_skip(sample_name,data)
   if @default_config[:opts][:skip_dupes]
     <<-EOF
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_merge \\
- picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./05_dup_marked/cleaned.bam \\
+ picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./04_dup_marked/cleaned.bam \\
  VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True COMPRESSION_LEVEL=8
 
 if [ "$?" -ne "0" ]; then
@@ -515,7 +515,7 @@ def mark_dupes(sample_name,data)
   <<-EOF
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_merge_mark_dups \\
   picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} \\
-  OUTPUT=./05_dup_marked/cleaned.bam METRICS_FILE=./05_dup_marked/mark_dups_metrics.txt \\
+  OUTPUT=./04_dup_marked/cleaned.bam METRICS_FILE=./04_dup_marked/mark_dups_metrics.txt \\
   VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True COMPRESSION_LEVEL=8
 
 if [ "$?" -ne "0" ]; then
@@ -961,7 +961,7 @@ fi
 trap final_clean EXIT
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
-if [ ! -e 05_dup_marked/cleaned.bam ]; then
+if [ ! -e 04_dup_marked/cleaned.bam ]; then
 <%=
   clean_commands(@sample_name,@data)
 %>
@@ -986,7 +986,7 @@ fi
 
 # Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
 # While we do that we shall also sort it, mark possible duplicates & make an index
-mkdir 05_dup_marked
+mkdir 04_dup_marked
 <%= mark_dupes_or_skip(@sample_name,@data) %>
 
 <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %>
@@ -1012,7 +1012,7 @@ else
     echo "Failed to make our temp work dir"
     exit 1
   fi
-fi #if 05_dup_marked/cleaned.bam already existed
+fi #if 04_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
 <%= indel_realign(@sample_name,@data) %>
@@ -1022,12 +1022,11 @@ fi #if 05_dup_marked/cleaned.bam already existed
 # fastqc info
 qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
 
-
 # Clean up after ourselves
 rm -rf 00_inputs \
 01_bwa_aln_sai \
 02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
-05_dup_marked \
+04_dup_marked \
 06_intervals \
 07_realigned_bam \
 08_uncalibated_covariates \
