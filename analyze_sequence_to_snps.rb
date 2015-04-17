@@ -450,10 +450,15 @@ def known_indels_opts()
   end
 end
 
+def gatk_steps(sample_name,data)
+end
+
 def indel_realign(sample_name,data)
   if @default_config[:opts][:skip_indel_realign]
+    d = File.dirname(@current_input)
+    @current_input = "07_realigned_bam/cleaned.bam"
     return <<-EOF
-      ln -s 04_dup_marked 07_realigned_bam
+      ln -s #{d} 07_realigned_bam
     EOF
   else
     indel_realignment(sample_name,data)
@@ -466,12 +471,14 @@ def indel_realignment(sample_name,data)
                 else
                   "--bam_compression 8"
                 end
+  f = @current_input
+  @current_input = "07_realigned_bam/cleaned.bam"
   ERB.new(<<-EOF
     # Calculate intervals for realignment
     mkdir 06_intervals
     qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_intervals \\
      -l virtual_free=1G,mem_free=1G,h_vmem=20G \\
-     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./04_dup_marked/cleaned.bam -o ./06_intervals/cleaned.intervals -nt 10
+     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./#{f} -o ./06_intervals/cleaned.intervals -nt 10
 
     if [ "$?" -ne "0" ]; then
      echo -e "Failure with target realigment creation"
@@ -594,6 +601,8 @@ def path_variables()
   ERB.new(<<-EOF
 GATK_BIN=`which gatk`
 GATK_BASE=`dirname ${GATK_BIN}`"/.."
+GATK_REF=<%= @data.first[:gatk_ref] || @default_config[:gatk_ref] %>
+GATK_DBSNP=<%= @data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
 EOF
 ).result(binding)
 end
@@ -602,13 +611,13 @@ end
 
 class DNAAnalysisTemplate < AnalysisTemplate
 
-def path_variables()
-  super() + 
-  ERB.new(<<-EOF
-GATK_REF=<%= @data.first[:gatk_ref] || @default_config[:gatk_ref] %>
-GATK_DBSNP=<%= @data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
+def gatk_steps(sample_name,data)
+  @current_input = "04_dup_marked/cleaned.bam"
+  <<-EOF
+#{indel_realign(sample_name,data)}
+
+#{covariate_or_final(sample_name,data)}
 EOF
-).result(binding)
 end
 
 def reference_for_data(data)
@@ -640,8 +649,37 @@ end
 
 class RNAAnalysisTemplate < AnalysisTemplate
 
+def gatk_steps(sample_name,data)
+  @current_input = "04_dup_marked/cleaned.bam"
+  <<-EOF
+#{split_trim_reassign_qualities(sample_name,data)}
+
+#{indel_realign(sample_name,data)}
+
+#{covariate_or_final(sample_name,data)}
+EOF
+end
+
+def split_trim_reassign_qualities(sample_name,data)
+  @current_input = "05_split-n-trim/cleaned.bam"
+  <<-EOF
+#Split'n'Trim for RNASeq
+mkdir 05_split-n-trim
+
+qsub #{qsub_opts()} -R y -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_splitntrim \\
+ -l virtual_free=16G,mem_free=16G,h_vmem=20G \\
+ gatk -T SplitNCigarReads -R ${GATK_REF} -I 04_dup_marked/cleaned.bam -o ./#{@current_input} \\
+ -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 -U ALLOW_N_CIGAR_READS
+
+ if [ "$?" -ne "0" ]; then
+   echo -e "Failure with target realigment creation"
+   exit 1
+ fi
+EOF
+end
+
 def path_variables()
-  super() + 
+  super() +
   ERB.new(<<-EOF
 STAR_REF=<%= @data.first[:star_ref] || @default_config[:star_ref] %>
 STAR_INDEX=<%= star_index() %>
@@ -1015,9 +1053,7 @@ else
 fi #if 04_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
-<%= indel_realign(@sample_name,@data) %>
-
-<%= covariate_or_final(@sample_name,@data) %>
+<%= gatk_steps(@sample_name,@data) %>
 
 # fastqc info
 qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
@@ -1027,6 +1063,7 @@ rm -rf 00_inputs \
 01_bwa_aln_sai \
 02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
 04_dup_marked \
+05_split-n-trim \
 06_intervals \
 07_realigned_bam \
 08_uncalibated_covariates \
