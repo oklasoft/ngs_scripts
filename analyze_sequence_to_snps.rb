@@ -991,29 +991,27 @@ mkdir 05_dup_marked
 
 <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "rm -rf 03_sorted_bams" %>
 
-
-# TODO stop here if pre_gatk only
 if [ "$PRE_GATK_ONLY" == "Y" ]; then
-rm -rf 00_inputs \
-01_bwa_aln_sai \
-02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
-${TMP_DIR}
+  rm -rf 00_inputs \
+  01_bwa_aln_sai \
+  02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
+  ${TMP_DIR}
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
 
-rm -f qc/*.zip
+  rm -f qc/*.zip
 
-touch finished.txt
-exit 0
+  touch finished.txt
+  exit 0
 fi
 else
   rm -f finished.txt
   TMP_DIR=<%= tmp_dir_base_opt() %>
-if [ "$?" -ne "0" ]; then
-  echo "Failed to make our temp work dir"
-  exit 1
-fi
+  if [ "$?" -ne "0" ]; then
+    echo "Failed to make our temp work dir"
+    exit 1
+  fi
 fi #if 05_dup_marked/cleaned.bam already existed
 # start here if pre_gatk already done
 
