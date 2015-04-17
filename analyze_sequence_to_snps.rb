@@ -737,7 +737,7 @@ def process_sample(sample_name)
     data[i] = @default_config.merge(d)
     case data[i][:mode]
     when /\ADNA\z/i
-      if data[i][:bwa_ref] == nil 
+      if data[i][:bwa_ref] == nil
         @stderr.puts "Missing bwa reference for #{sample_name}"
         return 1
       end
