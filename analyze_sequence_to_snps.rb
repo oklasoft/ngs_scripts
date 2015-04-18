@@ -179,7 +179,7 @@ mkdir unaligned_fastq
 <% @data.each_with_index do |run,i| %>
 <%= bam_to_fastq_for_run(run,i) %>
 if [ "$?" -ne "0" ]; then
-echo -e "Failure extracting unalinged from bam <%= i %>"
+echo "Failure extracting unalinged from bam <%= i %>"
 exit 1
 fi
 <% end %>
@@ -295,7 +295,7 @@ def clean_commands(sample_name,data)
   cleans.join("\n") + <<-EOF
 
   if [ "$?" -ne "0" ]; then
-    echo -e "Failure with btang cleaning"
+    echo "Failure with btang cleaning"
     exit 1
   fi
 
@@ -355,7 +355,7 @@ def variant_call(sample_name,data)
     # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %>
 
     if [ "$?" -ne "0" ]; then
-     echo -e "Failure GVCF"
+     echo "Failure GVCF"
      exit 1
     fi
 EOF
@@ -390,7 +390,7 @@ def gvcf_by_chr(sample_name,data)
   -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
 
   if [ "$?" -ne "0" ]; then
-   echo -e "Failure GVCFing"
+   echo "Failure GVCFing"
    exit 1
   fi
 
@@ -400,7 +400,7 @@ def gvcf_by_chr(sample_name,data)
   <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.gvcf
 
   if [ "$?" -ne "0" ]; then
-   echo -e "Failure joining reduced reads"
+   echo "Failure joining reduced reads"
    exit 1
   fi
   rm -rf 15_gvcf
@@ -421,7 +421,7 @@ def reduce_reads(sample_name,data)
     qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_reduce_reads -l virtual_free=8G,mem_free=12G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
 
     if [ "$?" -ne "0" ]; then
-     echo -e "Failure reducing reads"
+     echo "Failure reducing reads"
      exit 1
     fi
 
@@ -429,7 +429,7 @@ def reduce_reads(sample_name,data)
     qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
     if [ "$?" -ne "0" ]; then
-     echo -e "Failure joining reduced reads"
+     echo "Failure joining reduced reads"
      exit 1
     fi
     mv 14_reduced_bam/<%= sample_name %>.bai 14_reduced_bam/<%= sample_name %>.bam.bai
@@ -481,7 +481,7 @@ def indel_realignment(sample_name,data)
      gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./#{f} -o ./06_intervals/cleaned.intervals -nt 10
 
     if [ "$?" -ne "0" ]; then
-     echo -e "Failure with target realigment creation"
+     echo "Failure with target realigment creation"
      exit 1
     fi
 
@@ -494,7 +494,7 @@ def indel_realignment(sample_name,data)
      --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
 
     if [ "$?" -ne "0" ]; then
-     echo -e "Failure with indel realigmnent"
+     echo "Failure with indel realigmnent"
      exit 1
     fi
   EOF
@@ -509,7 +509,7 @@ qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b
  VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True COMPRESSION_LEVEL=8
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure with merging the sams"
+  echo "Failure with merging the sams"
   exit 1
 fi
     EOF
@@ -526,7 +526,7 @@ qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b
   VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True COMPRESSION_LEVEL=8
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure with marking the duplicates"
+  echo "Failure with marking the duplicates"
   exit 1
 fi
   EOF
@@ -563,7 +563,7 @@ def covariate_recalibration(sample_name,data)
    -o ./08_uncalibated_covariates/recal_data.grp -nct 6
 
   if [ "$?" -ne "0" ]; then
-   echo -e "Failure counting covariates"
+   echo "Failure counting covariates"
    exit 1
   fi
 
@@ -575,7 +575,7 @@ def covariate_recalibration(sample_name,data)
    -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6
 
   if [ "$?" -ne "0" ]; then
-   echo -e "Failure reclibrating bam"
+   echo "Failure reclibrating bam"
    exit 1
   fi
 
@@ -672,7 +672,7 @@ qsub #{qsub_opts()} -R y -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_s
  -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 -U ALLOW_N_CIGAR_READS
 
  if [ "$?" -ne "0" ]; then
-   echo -e "Failure with target realigment creation"
+   echo "Failure with target realigment creation"
    exit 1
  fi
 EOF
@@ -1017,7 +1017,7 @@ mkdir 03_sorted_bams
 %>
 
 if [ "$?" -ne "0" ]; then
-  echo -e "Failure with alignment"
+  echo "Failure with alignment"
   exit 1
 fi
 
