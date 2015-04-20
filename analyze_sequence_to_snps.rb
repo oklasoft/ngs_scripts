@@ -465,6 +465,15 @@ def indel_realign(sample_name,data)
   end
 end
 
+def indel_realgment_additional_opts
+end
+
+def bqsr_additional_opts
+end
+
+def recalibrate_additional_opts()
+end
+
 def indel_realignment(sample_name,data)
   compression = if data.first[:recalibration_known_sites] || @default_config[:recalibration_known_sites]
                   ""
@@ -491,7 +500,7 @@ def indel_realignment(sample_name,data)
     qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_realign \\
      -l virtual_free=5G,mem_free=4G,h_vmem=8G \\
      gatk -T IndelRealigner <%= known_indels_opts() %> -R ${GATK_REF} -I ./04_dup_marked/cleaned.bam \\
-     --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{compression}
+     --targetIntervals ./06_intervals/cleaned.intervals -o ./07_realigned_bam/cleaned.bam --maxReadsInMemory 1000000 #{indel_realgment_additional_opts()} #{compression}
 
     if [ "$?" -ne "0" ]; then
      echo "Failure with indel realigmnent"
@@ -560,7 +569,7 @@ def covariate_recalibration(sample_name,data)
   qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_bqsr \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam \\
-   -o ./08_uncalibated_covariates/recal_data.grp -nct 6
+   -o ./08_uncalibated_covariates/recal_data.grp -nct 6 <%= bqsr_additional_opts() %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure counting covariates"
@@ -572,7 +581,7 @@ def covariate_recalibration(sample_name,data)
   qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_recalibrate \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp \\
-   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6
+   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6 <%= recalibrate_additional_opts %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure reclibrating bam"
@@ -715,6 +724,18 @@ def alignment_command(sample_name,data)
   j = libs.to_json.gsub(/"/,'\\"')
   cmd += " \\\n " + '\"' + "'" + j + "'" + '\"'
   return cmd
+end
+
+def indel_realgment_additional_opts
+  "-U ALLOW_N_CIGAR_READS"
+end
+
+def bqsr_additional_opts
+  indel_realgment_additional_opts()
+end
+
+def recalibrate_additional_opts
+  indel_realgment_additional_opts()
 end
 
 end
