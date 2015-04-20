@@ -713,7 +713,7 @@ def alignment_command(sample_name,data)
     }}
   end
   j = libs.to_json.gsub(/"/,'\\"')
-  cmd += " \\\n \\'#{j}\\'"
+  cmd += " \\\n " + '\"' + "'" + j + "'" + '\"'
   return cmd
 end
 

@@ -179,7 +179,6 @@ def main()
     FileUtils.remove_entry tmp_prefix_dir
     %w/_STARtmp Log.final.out Log.out Log.progress.out Log.std.out/.each do |f|
       file = "#{File.join(@options.output_base,index.to_s)}#{f}"
-      puts "Should we delete? #{file}"
       FileUtils.remove_entry(file) if File.exists?(file)
     end
   end
