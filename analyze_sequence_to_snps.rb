@@ -707,7 +707,7 @@ end
 def alignment_command(sample_name,data)
   cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y \\\n"
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_star_alignment \\\n"
-  cmd += " star_qsub_tasked.rb -t ${TMP_DIR} -o 03_sorted_bams -i ${STAR_INDEX} -r ${STAR_REF}"
+  cmd += " star_qsub_tasked.rb -V -t ${TMP_DIR} -o 03_sorted_bams -i ${STAR_INDEX} -r ${STAR_REF}"
   cmd += " -g #{star_gtf()}" if star_gtf()
   libs = []
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
