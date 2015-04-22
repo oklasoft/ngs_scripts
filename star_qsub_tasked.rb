@@ -109,6 +109,7 @@ def main()
   begin
     Dir.chdir(tmp_prefix_dir) do
       puts "Aligning #{lib[:paths].join(",")}" if @options.verbose
+      STDOUT.flush
 
       Dir.mkdir("1")
       Dir.chdir("1") do
@@ -121,7 +122,6 @@ def main()
         cmd += %W/--runThreadN #{threads}/
 
         puts cmd.join(" ") if @options.verbose
-        STDOUT.flush
         unless system(*cmd)
           $stderr.puts "Failure with STAR first pass"
           return_val = $?.exitstatus
@@ -167,7 +167,7 @@ def main()
 
         cmd = cmd.join(" ") + "|" + picard
 
-        cmd = "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+        cmd = "/bin/bash", "--norc", "--noprofile", "-v", "-o", "pipefail", "-o", "errexit", "-c", cmd
         puts cmd.join(" ") if @options.verbose
         unless system(*cmd)
           $stderr.puts "Failure with STAR second pass"
