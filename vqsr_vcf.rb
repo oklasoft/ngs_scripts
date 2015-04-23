@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 #
 # vqsr_vcf.rb
 # Created by Stuart Glenn on 2011-08-05

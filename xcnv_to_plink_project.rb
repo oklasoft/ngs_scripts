@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 
 class Person
   attr_reader :gid, :iid, :fid, :pid, :mid, :sex, :pheno

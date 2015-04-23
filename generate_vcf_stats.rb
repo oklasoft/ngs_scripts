@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 # encoding: UTF-8
 #
 # generate_vcf_stats.rb

@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 # encoding: UTF-8
 #
 # fix_vcf_generated_ped.rb

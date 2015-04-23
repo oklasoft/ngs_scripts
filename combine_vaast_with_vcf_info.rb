@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9
+#!/usr/bin/env ruby
 #
 # combine_vaast_with_vcf_info.rb
 # Created by Stuart Glenn on 2011-11-15
