@@ -94,7 +94,7 @@ end
 def tmp_dir_base_opt()
   base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || nil
   if base
-    "`mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=\"#{base}\"`"
+    "$(mktemp -d --suffix=.${SAMPLE}.$$ --tmpdir=\"#{base}\")"
   else
     "/tmp"
   end
@@ -426,7 +426,7 @@ def reduce_reads(sample_name,data)
     fi
 
     export JAVA_MEM_OPTS="-Xmx24G"
-    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR=${TMP_DIR} OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
+    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR="${TMP_DIR}" OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
 
     if [ "$?" -ne "0" ]; then
      echo "Failure joining reduced reads"
@@ -514,7 +514,7 @@ def mark_dupes_or_skip(sample_name,data)
   if @default_config[:opts][:skip_dupes]
     <<-EOF
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_merge \\
- picard MergeSamFiles TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./04_dup_marked/cleaned.bam \\
+ picard MergeSamFiles TMP_DIR="${TMP_DIR}" #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} OUTPUT=./04_dup_marked/cleaned.bam \\
  VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True USE_THREADING=True COMPRESSION_LEVEL=8
 
 if [ "$?" -ne "0" ]; then
@@ -530,7 +530,7 @@ end
 def mark_dupes(sample_name,data)
   <<-EOF
 qsub #{qsub_opts()} -l virtual_free=8G,mem_free=8G,h_vmem=56G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_merge_mark_dups \\
-  picard MarkDuplicates TMP_DIR=${TMP_DIR} #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} \\
+  picard MarkDuplicates TMP_DIR="${TMP_DIR}" #{input_sam_bam_files("INPUT=03_sorted_bams","bam")} \\
   OUTPUT=./04_dup_marked/cleaned.bam METRICS_FILE=./04_dup_marked/mark_dups_metrics.txt \\
   VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=6000000 CREATE_INDEX=True COMPRESSION_LEVEL=8
 
@@ -608,8 +608,8 @@ end
 
 def path_variables()
   ERB.new(<<-EOF
-GATK_BIN=`which gatk`
-GATK_BASE=`dirname ${GATK_BIN}`"/.."
+GATK_BIN=$(which gatk)
+GATK_BASE=$(dirname "${GATK_BIN}")"/.."
 GATK_REF=<%= @data.first[:gatk_ref] || @default_config[:gatk_ref] %>
 GATK_DBSNP=<%= @data.first[:snp_rod] || @default_config[:snp_rod] || 'nil' %>
 EOF
@@ -636,7 +636,7 @@ end
 def alignment_command(sample_name,data)
   cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
-  cmd += " bwa_mem_qsub_tasked.rb ${TMP_DIR} 03_sorted_bams #{reference_for_data(data)}"
+  cmd += " bwa_mem_qsub_tasked.rb \"${TMP_DIR}\" 03_sorted_bams #{reference_for_data(data)}"
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
       cmd += " paired"
@@ -705,9 +705,9 @@ def star_gtf()
 end
 
 def alignment_command(sample_name,data)
-  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y \\\n"
+  cmd = "qsub #{qsub_opts()} -pe threaded 6 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y \\\n"
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_star_alignment \\\n"
-  cmd += " star_qsub_tasked.rb -V -t ${TMP_DIR} -o 03_sorted_bams -i ${STAR_INDEX} -r ${STAR_REF}"
+  cmd += " star_qsub_tasked.rb -V -t \"${TMP_DIR}\" -o 03_sorted_bams -i ${STAR_INDEX} -r ${STAR_REF}"
   cmd += " -g #{star_gtf()}" if star_gtf()
   libs = []
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
@@ -1054,7 +1054,7 @@ if [ "$PRE_GATK_ONLY" == "Y" ]; then
   rm -rf 00_inputs \
   01_bwa_aln_sai \
   02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
-  ${TMP_DIR}
+  "${TMP_DIR}"
 <%=
   cleanup_cleaned_fastq_files(@sample_name)
 %>
@@ -1113,6 +1113,6 @@ if [ "$PRE_GATK_ONLY" != "Y" ]; then
 fi
 
 rm -f qc/*.zip
-rm -rf ${TMP_DIR}
+rm -rf "${TMP_DIR}"
 
 touch finished.txt
