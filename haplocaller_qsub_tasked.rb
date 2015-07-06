@@ -66,7 +66,6 @@ cmd = %W/gatk -T HaplotypeCaller
          -nct #{threads}
          -R #{options[:reference]}
          -I #{options[:input_bam]}
-         -variant_index_type LINEAR -variant_index_parameter 128000
          /
 if options[:dbsnp] then
   cmd += %W/-D #{options[:dbsnp]}/
@@ -85,7 +84,7 @@ unless options[:do_all]
 else
   options[:output_prefix] = File.join(options[:output_base],"#{options[:output_prefix]}")
 end
-cmd += ["-o","#{options[:output_prefix]}.gvcf"]
+cmd += ["-o","#{options[:output_prefix]}.g.vcf"]
 
 puts cmd.join(" ")
 STDOUT.flush

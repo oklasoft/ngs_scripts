@@ -149,10 +149,10 @@ module unload fastqc
 module unload tabix
 module unload btags
 #{aligner_unload_load()}
-module load samtools/0.1.19
+module load samtools/1.2
 module load picard/1.118
-module load gatk/3.3-0
-module load fastqc/0.10.1
+module load gatk/3.4-0
+module load fastqc/0.11.1
 module load tabix/0.2.6
 module load btangs/1.6.0
 
@@ -350,8 +350,7 @@ def variant_call(sample_name,data)
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
-    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.gvcf \\
-    -variant_index_type LINEAR -variant_index_parameter 128000 <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
     # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %>
 
     if [ "$?" -ne "0" ]; then
@@ -366,15 +365,15 @@ EOF
 
   return caller + ERB.new(<<-EOF
 
-  bgzip <%= sample_name %>.gvcf
-  tabix -p vcf <%= sample_name %>.gvcf.gz
+  bgzip <%= sample_name %>.g.vcf
+  tabix -p vcf <%= sample_name %>.g.vcf.gz
 EOF
   ).result(binding)
 end
 
 def gvcf_by_chr(sample_name,data)
   chr_gvcfs = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
-    "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.gvcf"
+    "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.g.vcf"
   end
   snprod = if data.first[:snp_rod] || @default_config[:snp_rod]
     "-d ${GATK_DBSNP}"
@@ -397,7 +396,7 @@ def gvcf_by_chr(sample_name,data)
   export JAVA_MEM_OPTS="-Xmx24G"
   qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_gvcf \\
   -l virtual_free=20G,mem_free=20G,h_vmem=30G gatk -T CombineGVCFs -R ${GATK_REF} \\
-  <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.gvcf
+  <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.g.vcf
 
   if [ "$?" -ne "0" ]; then
    echo "Failure joining reduced reads"
@@ -742,8 +741,8 @@ end
 
 
 class AnalysisTemplaterApp
-VERSION       = "4.0.0"
-REVISION_DATE = "20150423"
+VERSION       = "4.1.0"
+REVISION_DATE = "20150706"
 AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
 COPYRIGHT     = "Copyright (c) 2012-2015 Oklahoma Medical Research Foundation"
 
