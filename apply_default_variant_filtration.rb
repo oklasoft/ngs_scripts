@@ -55,8 +55,18 @@ unless File.readable?(input_vcf)
 end
 
 (base_dir,file) = File.split(input_vcf)
+is_compressed = false
 extension = File.extname(file)
-output_vcf = File.join(base_dir,"#{File.basename(file,extension)}_filters#{extension}")
+strip_extension = extension
+if ".gz" == extension
+  is_compressed = true
+  extension = File.extname(File.basename(file,extension))
+  strip_extension = extension + ".gz"
+end
+output_vcf = File.join(base_dir,"#{File.basename(file,strip_extension)}_filters#{extension}")
+if is_compressed then
+  output_vcf += ".gz"
+end
 
 if File.exist?(output_vcf) then
   STDERR.puts "A file with the output name we would use (#{output_vcf}) already exists. I won't overwrite"
