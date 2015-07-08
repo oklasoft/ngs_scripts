@@ -84,8 +84,8 @@ gatk -T VariantFiltration \\
 --filterName "GATK_QD" \\
 --filterExpression "FS >  60.0 &&  SB > -0.1" \\
 --filterName "GATKStrandBias"  \\
---filterExpression "HaplotypeScore > 13.0" \\
---filterName "GATK_HS"  \\
+--filterExpression "SOR > 4.0" \\
+--filterName "GATK_SOR"  \\
 --filterExpression "MQRankSum < -12.5" \\
 --filterName "GATKS_MRS" \\
 --filterExpression "ReadPosRankSum < -8.0"  \\
