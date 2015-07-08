@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 #
 # apply_default_variant_filtration.rb
-# Created by Stuart Glenn on 2011-06-09T15:39:34-0500 
+# Created by Stuart Glenn on 2011-06-09T15:39:34-0500
 #
 # == Synopsis
 # Quick script to wrap the work of running our standard GATK variant filters
@@ -42,6 +42,8 @@ input_vcf = ARGV.shift
 
 reference = ARGV.shift || "/Volumes/hts_core/Shared/homo_sapiens_37/chr_fixed/b37.fasta"
 
+mode = ARGV.shift || "snp"
+
 unless input_vcf then
   STDERR.puts "Missing input VCF file"
   exit 1
@@ -78,6 +80,11 @@ gatk -T VariantFiltration \\
 -R #{reference} \\
 -o #{output_vcf}  \\
 -V #{input_vcf} \\
+EOF
+
+cmd += case mode
+when "snp"
+<<-EOF
 --filterExpression "MQ <  40.0" \\
 --filterName "GATK_MQ" \\
 --filterExpression "QD <  2.0" \\
@@ -91,6 +98,20 @@ gatk -T VariantFiltration \\
 --filterExpression "ReadPosRankSum < -8.0"  \\
 --filterName "GATK_RPRS"
 EOF
+when "indel"
+<<-EOF
+--filterExpression "InbreedingCoeff < -0.8" \\
+--filterName "GATK_indel_IC" \\
+--filterExpression "QD < 2.0" \\
+--filterName "GATK_indel_QD" \\
+--filterExpression "FS >  200.0" \\
+--filterName "GATK_indel_FS" \\
+--filterExpression "ReadPosRankSum <  -20.0" \\
+--filterName "GATK_indel_RPRS" \\
+--filterExpression "SOR > 10.0" \\
+--filterName "GATK_indel_SOR"
+EOF
+end
 
 puts cmd
 exec(cmd)
