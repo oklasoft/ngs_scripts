@@ -151,7 +151,7 @@ module unload btags
 #{aligner_unload_load()}
 module load samtools/1.2
 module load picard/1.118
-module load gatk/3.4-0
+module load gatk/3.4-46
 module load fastqc/0.11.1
 module load tabix/0.2.6
 module load btangs/1.6.0
