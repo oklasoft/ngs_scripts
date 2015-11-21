@@ -206,13 +206,8 @@ def fastq_file_list(sample_name,data)
       pair_part = sequence[:is_paired] ? i_i+1 : 0
       shell_var = "FASTQ#{fastqs.size+1}"
       base_file = "#{cleaned_prefix}_#{pair_part}".downcase
-      path = if @default_config[:opts][:skip_btangs]
-        input
-      else
-        "`pwd`\"/#{prefix}/#{base_file}.fastq\""
-      end
-      fastqs << "#{shell_var}=#{path}"
-      @fastq_shell_vars[shell_var] = {:path  => path, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
+      fastqs << "#{shell_var}=#{input}"
+      @fastq_shell_vars[shell_var] = {:path  => input, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
       @fastq_shell_vars_by_lane[-1] << shell_var
       @input_sam_files << {:index => s_i, :b_index => pair_part}
     end
@@ -227,16 +222,6 @@ end
 
 def ordered_bam_inputs()
   @input_sam_files.map {|s| "#{s[:b_index]} ./00_inputs/#{s[:index]}.bam"}.join(" ")
-end
-
-def cleanup_cleaned_fastq_files(sample_name)
-  return "echo noop" if @default_config[:opts][:skip_btangs]
-  cmds = []
-  @fastq_shell_vars_by_lane.flatten.each_with_index do |input,i|
-    cmds << "rm -f ${#{input}}"
-    cmds << "qsub #{qsub_opts()} -o logs -b y -V -j y -cwd -N a_#{sample_name}_gzip_#{i}_rejects gzip -9 #{@fastq_shell_vars[input][:prefix]}/rejects.txt" if 0==i%2
-  end
-  cmds.join("\n")
 end
 
 def total_number_input_sequence_files
@@ -749,7 +734,7 @@ def run_real
   @default_config = (@config["DEFAULT"] || [
                      {:run => nil, :lane => nil, :bwa_ref => nil, :star_ref => nil, :star_gtf => nil, :star_index => nil,
                        :gatk_ref => nil, :snp_rod => nil, :mode => nil,
-                       :opts=>{:skip_btangs => true, :skip_gvcf => false,
+                       :opts=>{:skip_gvcf => false,
                          :skip_indel_realign => false,
                          :reduce_reads=>false}
                      }]).first
@@ -1024,9 +1009,6 @@ if [ "$PRE_GATK_ONLY" == "Y" ]; then
   01_bwa_aln_sai \
   02_bwa_alignment <%= (@data.first.has_key?(:keep_unaligned) && @data.first[:keep_unaligned]) ? "": "03_sorted_bams" %> \
   "${TMP_DIR}"
-<%=
-  cleanup_cleaned_fastq_files(@sample_name)
-%>
 
   rm -f qc/*.zip
 
@@ -1073,13 +1055,6 @@ rm -rf 00_inputs \
     cmd
   end
 %>
-
-# gzip & clean up some of the cleaned input as we keep some it for now, but don't need it fullsized
-if [ "$PRE_GATK_ONLY" != "Y" ]; then
-<%=
-  cleanup_cleaned_fastq_files(@sample_name)
-%>
-fi
 
 rm -f qc/*.zip
 rm -rf "${TMP_DIR}"
