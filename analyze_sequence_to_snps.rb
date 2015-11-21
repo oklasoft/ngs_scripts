@@ -154,7 +154,6 @@ module load picard/1.118
 module load gatk/3.4-46
 module load fastqc/0.11.1
 module load tabix/0.2.6
-module load btangs/1.6.0
 
 set -o pipefail
 EOS
@@ -275,31 +274,6 @@ def input_sam_bam_files(prefix,suffix)
     cmd += "#{prefix}/#{i}.#{suffix} "
   end
   cmd
-end
-
-def clean_commands(sample_name,data)
-  return if @default_config[:opts][:skip_btangs]
-  #clean_sample.rb -r ${RUN} -l ${LANE} -s <%= sample_name %> -b . [--single] INPUT_SEQUENCE
-  cleans = ["# initial PCR clean by 'bins' via btangs"]
-  data.each_with_index do |sequence,s_i|
-    cmd = "clean_sample.rb -s #{sample_name} -r #{sequence[:run]} -l #{sequence[:lane]} -b ."
-    if sequence[:trim_end]
-      cmd += " --trim-end #{sequence[:trim_end]}"
-    end
-    unless sequence[:is_paired]
-      cmd += " --single-end"
-    end
-    cmd += " #{sequence[:inputs].join(" ").gsub(/\\/,"\\\\\\")}"
-    cleans << "qsub #{qsub_opts()} -pe threaded 2 -l hadoop=1,h_vmem=4G -o logs -sync y -b y -V -j y -cwd -N a_#{sample_name}_clean_#{s_i+1} #{cmd}"
-  end
-  cleans.join("\n") + <<-EOF
-
-  if [ "$?" -ne "0" ]; then
-    echo "Failure with btang cleaning"
-    exit 1
-  fi
-
-EOF
 end
 
 # output a -D SNP rod file, if we have a snp_rod
@@ -1020,10 +994,6 @@ trap final_clean EXIT
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
 if [ ! -e 04_dup_marked/cleaned.bam ]; then
-<%=
-  clean_commands(@sample_name,@data)
-%>
-
 # fastqc info
 mkdir qc
 qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
