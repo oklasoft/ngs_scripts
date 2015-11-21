@@ -280,11 +280,7 @@ def opt_l_interval(data)
 end
 
 def alignment_summary(sample_name,data)
-  bam_dir = unless @default_config[:opts][:reduce_reads]
-              "13_final_bam"
-            else
-              "14_reduced_bam"
-            end
+  bam_dir = "13_final_bam"
   cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
   cmd+=" REFERENCE_SEQUENCE=${GATK_REF}"
@@ -292,14 +288,11 @@ def alignment_summary(sample_name,data)
 end
 
 def variant_call(sample_name,data)
-  bam_dir = ''
   if @default_config[:opts][:skip_gvcf]
     return ""
-  else
-    bam_dir = "13_final_bam"
-    bam_dir = "14_reduced_bam" if @default_config[:opts][:reduce_reads]
   end
   caller = ""
+  bam_dir = "13_final_bam"
   if data.first[:interval_file] then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
@@ -358,46 +351,13 @@ def gvcf_by_chr(sample_name,data)
   <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.g.vcf
 
   if [ "$?" -ne "0" ]; then
-   echo "Failure joining reduced reads"
+   echo "Failure joining gvcfs"
    exit 1
   fi
   rm -rf 15_gvcf
 
   EOF
   ).result(binding)
-end
-
-def reduce_reads(sample_name,data)
-  chr_bams = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
-    "INPUT=14_reduced_bam/by_chr/#{sample_name}-#{chr}.bam"
-  end
-  if @default_config[:opts][:reduce_reads]
-    ERB.new(<<-EOF
-    # Make a reduce reads BAM for variant calling better/faster/stronger
-    mkdir 14_reduced_bam
-    export JAVA_MEM_OPTS="-Xmx16G"
-    qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_reduce_reads -l virtual_free=8G,mem_free=12G,h_vmem=20G read_reducer_qsub_tasked.rb ${GATK_REF} 14_reduced_bam <%= sample_name %> ./13_final_bam/<%= sample_name %>.bam
-
-    if [ "$?" -ne "0" ]; then
-     echo "Failure reducing reads"
-     exit 1
-    fi
-
-    export JAVA_MEM_OPTS="-Xmx24G"
-    qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_reduce_reads -l virtual_free=10G,mem_free=18G,h_vmem=48G picard MergeSamFiles TMP_DIR="${TMP_DIR}" OUTPUT=14_reduced_bam/<%= sample_name %>.bam USE_THREADING=True VALIDATION_STRINGENCY=LENIENT MAX_RECORDS_IN_RAM=3000000 COMPRESSION_LEVEL=7 CREATE_INDEX=True SORT_ORDER=coordinate <%= chr_bams.join(" ") %>
-
-    if [ "$?" -ne "0" ]; then
-     echo "Failure joining reduced reads"
-     exit 1
-    fi
-    mv 14_reduced_bam/<%= sample_name %>.bai 14_reduced_bam/<%= sample_name %>.bam.bai
-    rm -rf 14_reduced_bam/by_chr
-
-    EOF
-    ).result(binding)
-  else
-    return ""
-  end
 end
 
 def known_indels_opts()
@@ -732,11 +692,19 @@ private
 # Do the work of running this app
 def run_real
   @default_config = (@config["DEFAULT"] || [
-                     {:run => nil, :lane => nil, :bwa_ref => nil, :star_ref => nil, :star_gtf => nil, :star_index => nil,
-                       :gatk_ref => nil, :snp_rod => nil, :mode => nil,
-                       :opts=>{:skip_gvcf => false,
-                         :skip_indel_realign => false,
-                         :reduce_reads=>false}
+                     {:run => nil,
+                      :lane => nil,
+                      :bwa_ref => nil,
+                      :star_ref => nil,
+                      :star_gtf => nil,
+                      :star_index => nil,
+                      :gatk_ref => nil,
+                      :snp_rod => nil,
+                      :mode => nil,
+                      :opts=>{
+                        :skip_gvcf => false,
+                        :skip_indel_realign => false
+                      }
                      }]).first
 
   @default_config[:opts].merge!(:qsub_opts => @options.qsub_opts) if '' != @options.qsub_opts
@@ -958,7 +926,7 @@ __END__
 bash_header()
 %>
 
-# It is easier to use variables for thse paths
+# It is easier to use variables for these paths
 <%= path_variables() %>
 
 SAMPLE="<%= @sample_name %>"
@@ -995,7 +963,6 @@ if [ "$?" -ne "0" ]; then
   echo "Failure with alignment"
   exit 1
 fi
-
 
 # Now we might have had many input SAMs, so let us merge those all into a single BAM using picard
 # While we do that we shall also sort it, mark possible duplicates & make an index
@@ -1041,8 +1008,6 @@ rm -rf 00_inputs \
 08_uncalibated_covariates \
 10_recalibrated_bam \
 11_calibated_covariates
-
-<%= reduce_reads(@sample_name,@data) %>
 
 # Get some summary stats on the alignment off in the background
 <%= alignment_summary(@sample_name,@data) %>
