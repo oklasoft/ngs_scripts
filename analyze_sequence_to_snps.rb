@@ -302,8 +302,7 @@ def variant_call(sample_name,data)
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
-    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
-    # -stand_emit_conf 10.0 -stand_call_conf <%= unified_genotyper_strand_call_conf(data) %>
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
 
     if [ "$?" -ne "0" ]; then
      echo "Failure GVCF"
@@ -315,12 +314,7 @@ EOF
     caller = gvcf_by_chr(sample_name,data)
   end
 
-  return caller + ERB.new(<<-EOF
-
-  bgzip <%= sample_name %>.g.vcf
-  tabix -p vcf <%= sample_name %>.g.vcf.gz
-EOF
-  ).result(binding)
+  return caller
 end
 
 def gvcf_by_chr(sample_name,data)
@@ -348,7 +342,7 @@ def gvcf_by_chr(sample_name,data)
   export JAVA_MEM_OPTS="-Xmx24G"
   qsub <%= qsub_opts() %> -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_join_gvcf \\
   -l virtual_free=20G,mem_free=20G,h_vmem=30G gatk -T CombineGVCFs -R ${GATK_REF} \\
-  <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.g.vcf
+  <%= chr_gvcfs.join(" ") %> -o <%= sample_name %>.g.vcf.gz
 
   if [ "$?" -ne "0" ]; then
    echo "Failure joining gvcfs"
@@ -1006,8 +1000,7 @@ rm -rf 00_inputs \
 06_intervals \
 07_realigned_bam \
 08_uncalibated_covariates \
-10_recalibrated_bam \
-11_calibated_covariates
+10_recalibrated_bam
 
 # Get some summary stats on the alignment off in the background
 <%= alignment_summary(@sample_name,@data) %>
