@@ -127,7 +127,7 @@ end
 def aligner_unload_load()
   case mode()
   when :dna
-    "module unload bwa\nmodule load bwa/0.7.10"
+    "module unload bwa\nmodule load bwa/0.7.12"
   when :rna
     "module unload star\nmodule load star/2.4.0h"
   end
