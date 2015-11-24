@@ -3,14 +3,13 @@
 require 'tmpdir'
 
 args = ARGV.clone
-# args.shift
 tmp_base = args.shift
 output_base = args.shift
 reference = args.shift
 index = (ENV['SGE_TASK_ID']||1).to_i - 1
 threads = (ENV['NSLOTS']) || 1
 
-groups = [] #ARGV.each_slice(5).to_a[index]
+groups = []
 
 while a = args.shift
   data = {}
@@ -21,7 +20,6 @@ while a = args.shift
   end
   data[:tag] = args.shift
   data[:inputs] = ["#{args.shift}"]
-
   data[:inputs] << ["#{args.shift}"] if "paired" == data[:mode]
 
   groups << data
