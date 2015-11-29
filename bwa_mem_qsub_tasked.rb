@@ -20,21 +20,27 @@ while a = args.shift
   end
   data[:tag] = args.shift
   data[:inputs] = ["#{args.shift}"]
-  data[:inputs] << ["#{args.shift}"] if "paired" == data[:mode]
+  data[:inputs] << "#{args.shift}" if "paired" == data[:mode]
 
   groups << data
 end
 
 data = groups[index]
-
 tag = data[:tag]
-
 output = File.join(output_base,"#{index}.bam")
+
+data[:inputs].map! do |i|
+  if i =~ /\.xz$/
+    "<(xzcat #{i})"
+  else
+    i
+  end
+end
 
 return_val = -1
 Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
   cmd = "bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}"
-  cmd += "|samtools view -Shu - | samtools sort -@ 2 -m 4G -o - #{tmp_prefix_dir}/#{index} > #{output}"
+  cmd += "|samtools view -Shu - | samtools sort -@ 4 -m 4G -o - #{tmp_prefix_dir}/#{index} > #{output}"
 
   puts cmd
   STDOUT.flush
