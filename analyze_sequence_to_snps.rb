@@ -380,6 +380,7 @@ def indel_realgment_additional_opts
 end
 
 def bqsr_additional_opts
+  indel_realgment_additional_opts() + " -SQQ 10 -SQQ 20 -SQQ 30 -SQQ 40"
 end
 
 def recalibrate_additional_opts()
