@@ -384,6 +384,7 @@ def bqsr_additional_opts
 end
 
 def recalibrate_additional_opts()
+  indel_realgment_additional_opts() + " --disable_indel_quals"
 end
 
 def indel_realignment(sample_name,data)
