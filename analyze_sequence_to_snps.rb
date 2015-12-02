@@ -363,6 +363,30 @@ end
 def gatk_steps(sample_name,data)
 end
 
+def fastqc_bam(sample_name,data)
+  if @default_config[:opts][:fastqc_bam]
+    return <<-EOF
+# fastqc info
+mkdir qc
+qsub #{qsub_opts()} -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_#{sample_name}_qc fastqc -o qc ./13_final_bam/#{sample_name}.bam
+    EOF
+  else
+    return ""
+  end
+end
+
+def fastqc_fastq(sample_name)
+  if @default_config[:opts][:fastqc_fastq]
+    return <<-EOF
+# fastqc info
+mkdir qc
+qsub #{qsub_opts()} -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_#{sample_name}_qc fastqc -o qc #{fastq_shell_vars()}
+    EOF
+  else
+    return ""
+  end
+end
+
 def indel_realign(sample_name,data)
   if @default_config[:opts][:skip_indel_realign]
     d = File.dirname(@current_input)
@@ -698,7 +722,9 @@ def run_real
                       :mode => nil,
                       :opts=>{
                         :skip_gvcf => false,
-                        :skip_indel_realign => false
+                        :skip_indel_realign => false,
+                        :fastqc_bam => false,
+                        :fastqc_fastq => false
                       }
                      }]).first
 
@@ -942,9 +968,7 @@ trap final_clean EXIT
 export GATK_JAVA_OPTS="-Djava.io.tmpdir=${TMP_DIR}"
 
 if [ ! -e 04_dup_marked/cleaned.bam ]; then
-# fastqc info
-mkdir qc
-qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc <%= fastq_shell_vars() %>
+<%= fastqc_fastq(@sample_name) %>
 
 export JAVA_MEM_OPTS="-Xmx16G"
 
@@ -989,8 +1013,7 @@ fi #if 04_dup_marked/cleaned.bam already existed
 
 <%= gatk_steps(@sample_name,@data) %>
 
-# fastqc info
-qsub <%= qsub_opts() %> -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_<%= @sample_name %>_qc fastqc -o qc ./13_final_bam/<%= @sample_name %>.bam
+<%= fastqc_bam(@sample_name,@data) %>
 
 # Clean up after ourselves
 rm -rf 00_inputs \
