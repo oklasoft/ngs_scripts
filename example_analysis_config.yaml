@@ -1,43 +1,67 @@
---- 
-DEFAULT: 
-- :bwa_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/bwa_indexed/hg18.fa
-  :gatk_ref: /Volumes/hts_core/Shared/homo_sapiens_36.1/chr_fixed/hg18.fasta
-  :snp_rod: /Volumes/hts_core/Shared/dbsnp/dbsnp_130_hg18.rod
-  :recalibration_known_sites:
-  - /Volumes/hts_core/Shared/gatk_resources/b37/dbsnp_132.b37.vcf
-  - /Volumes/hts_core/Shared/gatk_resources/b37/other_dbsnp_132.b37.vcf
+---
+DEFAULT:
+- :bwa_ref: /Volumes/hts_core/Shared/gatk_resources/2.3/b37/bwa_7_6_indexed/human_g1k_v37.fasta
+  :gatk_ref: /Volumes/hts_core/Shared/gatk_resources/2.3/b37/bwa_7_6_indexed/human_g1k_v37.fasta
+  :snp_rod: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz
+  :interval_file: ../../../metadata/01_intervals/sureselect_v5_utr_targets_with_decoy.interval_list
   :known_indels:
-  - /Volumes/hts_core/Shared/some_indel.vcf
-  - /Volumes/hts_core/Shared/some_other_indel.vcf
-  :quality_type: "Standard"
+  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/1000G_phase1.indels.b37.vcf.gz
+  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+  :recalibration_known_sites:
+  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz
+  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+  :keep_unaligned: false
+  :quality_type: Standard
+  :mode: dna
   :opts:
-    :skip_btangs: false
-    :skip_vcf: false
-  :vqsr: 
+    :skip_gvcf: false
+    :skip_indel_realign: false
+    :qsub_opts: -q this.q
+    :tmp_dir_base: /fast_scratch
+  :vqsr_snp:
     :variant_recalibrator_opts:
-      :maxGaussians: 4
-      :percentBadVariants: 0.05
-    :training_sets: 
+      :maxGaussians: 6
+      :mode: SNP
+    :apply_recalibration_opts:
+      :mode: SNP
+      :ts_filter_level: 99.5
+    :training_sets:
     - :name: hapmap
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/b37/hapmap_3.3.b37.sites.vcf
-      :params: "known=false,training=true,truth=true,prior=15.0"
+      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/hapmap_3.3.b37.vcf.gz
+      :params: known=false,training=true,truth=true,prior=15.0
     - :name: omni
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/b37/1000G_omni2.5.b37.sites.vcf
-      :params: "known=false,training=true,truth=false,prior=12.0"
+      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/1000G_omni2.5.b37.vcf.gz
+      :params: known=false,training=true,truth=false,prior=12.0
     - :name: dbsnp
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/b37/dbsnp_132.b37.vcf
-      :params: "known=true,training=false,truth=false,prior=8.0"
-    :annotations: 
-    - HaplotypeScore
+      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz
+      :params: known=true,training=false,truth=false,prior=6.0
+    :annotations:
     - MQRankSum
     - ReadPosRankSum
     - FS
-    - MQ
+    - DP
     - QD
-    - InbreedingCoeff
+  :vqsr_indel:
+    :variant_recalibrator_opts:
+      :maxGaussians: 4
+      :mode: INDEL
+      :stdThreshold: 10.0
+    :apply_recalibration_opts:
+      :mode: INDEL
+      :ts_filter_level: 99.0
+    :training_sets:
+    - :name: mills
+      :type: VCF
+      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+      :params: known=true,training=true,truth=true,prior=12.0
+    :annotations:
+    - MQRankSum
+    - ReadPosRankSum
+    - FS
+    - DP
 test: 
 - :run: "001"
   :inputs: 
