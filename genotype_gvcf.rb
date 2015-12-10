@@ -11,6 +11,7 @@
 require 'yaml'
 require 'optparse'
 require 'thread'
+require 'fileutils'
 
 STEPS_DIRS_FILES = {
   genotypegvcf:{dir:"00_original_vcf", files:[], ext:lambda {|f|["#{f}-raw.vcf.gz"]}},
@@ -130,6 +131,10 @@ def work(jobs)
             elsif 0 != status.exitstatus
               STDERR.puts "Failed to run #{job[:cmd]}: #{$?}"
               passed = false
+            else #clean run, burn in hell log file
+              (Dir.glob("#{job[:name]}.po[0-9]*") + Dir.glob("#{job[:name]}.o[0-9]*")).each do |l|
+                File.delete(l)
+              end
             end
           end
         end #while job
@@ -230,6 +235,16 @@ def vqsr(gatk_opts, opts)
       jobs << { name:"vqsr#{f}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
     end
     passed = work(jobs)
+    if passed
+      STEPS_DIRS_FILES[:vqsr][:types].each do |type|
+        dir = File.join("#{type}s_vqsr","#{Time.now.strftime("%Y%m%d")}_vqsr_vcf_work.")
+        Dir.glob("#{dir}[0-9]*").each do |d|
+          if File.directory?(d)
+            FileUtils.remove_entry_secure(d)
+          end
+        end
+      end
+    end
   end # split dir
   return passed
 end
@@ -306,6 +321,22 @@ def tabix(gatk_opts,opts)
   return passed
 end
 
+def cleanup()
+  STEPS_DIRS_FILES.each do |step,dirs_files|
+    next if :tabix == step
+    dirs_files[:files].each do |f|
+      file = File.join(dirs_files[:dir],f)
+      ["",".tbi",".idx"].each do |ext|
+        File.delete(file+ext) if File.exists?(file+ext)
+      end
+      begin
+        Dir.rmdir(dirs_files[:dir])
+      rescue SystemCallError
+      end
+    end
+  end
+end
+
 def main
   options = parsed_opts()
   %w/conf_file/.each do |k|
@@ -332,7 +363,8 @@ def main
       vqsr(gatk_opts, options) &&
       merge_snp_indels(gatk_opts,options) &&
       recode(gatk_opts,options) &&
-      tabix(gatk_opts,options)
+      tabix(gatk_opts,options) &&
+      cleanup()
   end
   unless passed
     exit(1)
