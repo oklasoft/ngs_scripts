@@ -29,9 +29,13 @@ data = groups[index]
 tag = data[:tag]
 output = File.join(output_base,"#{index}.bam")
 
+pre = ""
+post = ""
 data[:inputs].map! do |i|
   if i =~ /\.xz$/
-    "<(xzcat #{i})"
+    pre ="(t=`mktemp`;"
+    post = " && rm ${t})"
+    "<(xzcat #{i} || rm -f ${t})"
   else
     i
   end
@@ -39,8 +43,8 @@ end
 
 return_val = -1
 Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
-  cmd = "bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}"
-  cmd += "|samtools view -Shu - | samtools sort -@ 4 -m 4G -o - #{tmp_prefix_dir}/#{index} > #{output}"
+  cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}#{post}"
+  cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
 
   puts cmd
   STDOUT.flush
