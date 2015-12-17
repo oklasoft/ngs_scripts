@@ -148,7 +148,7 @@ module unload gatk
 module unload fastqc
 module unload btags
 #{aligner_unload_load()}
-module load samtools/1.2
+module load samtools/1.3
 module load picard/1.141
 module load gatk/3.5-0-g36282e4
 module load fastqc/0.11.1
