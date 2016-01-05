@@ -73,11 +73,6 @@ end
 pre = ""
 post = ""
 data[:inputs].map! do |i|
-  #if i =~ /^http.*/ && i =~ /\.xz$/
-    #pre ="(t=`mktemp`;"
-    #post = " && rm ${t})"
-    #(account,cont,obj)=i.scan(/^https:\/\/o3.omrf.org\/v1\/([^\/]+)\/([^\/]+)\/(.*)/)[0]
-    #"<(swift download -R 3 #{cont} #{obj} ; xzcat #{obj}  || rm -f ${t})"
   if i =~ /\.xz$/
     pre ="(t=`mktemp`;"
     post = " && rm ${t})"
