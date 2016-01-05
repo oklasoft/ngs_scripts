@@ -51,12 +51,13 @@ data[:inputs].map! do |i|
     cmd = case u.scheme
     when /^https?/
       # curl it
-      %W/curl --retry 3 -f -o #{tmp_file} #{i}/
+      %W/curl -s --retry 3 -f -o #{tmp_file} #{i}/
     when /^o3/
       # swift it
       (container,object)= u.path.scan(/^\/([^\/]+)\/(.*)/)[0]
       %W/swift download -R 3 -o #{tmp_file} #{container} #{object}/
     end
+    puts "Downloading #{i}..."
     pid = spawn(*cmd,STDOUT=>STDERR)
     pid, status = Process.wait2(pid)
     if nil == status
