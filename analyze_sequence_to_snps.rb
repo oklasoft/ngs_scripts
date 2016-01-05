@@ -204,7 +204,7 @@ def fastq_file_list(sample_name,data)
       pair_part = sequence[:is_paired] ? i_i+1 : 0
       shell_var = "FASTQ#{fastqs.size+1}"
       base_file = "#{cleaned_prefix}_#{pair_part}".downcase
-      fastqs << "#{shell_var}=#{input}"
+      fastqs << "#{shell_var}=\"#{input}\""
       @fastq_shell_vars[shell_var] = {:path  => input, :paired => pair_part, :letter => letter, :base_file => base_file, :prefix => prefix}
       @fastq_shell_vars_by_lane[-1] << shell_var
       @input_sam_files << {:index => s_i, :b_index => pair_part}
@@ -585,7 +585,7 @@ def alignment_command(sample_name,data)
     cmd += " '\"@RG\\\\tID:#{sample_name}_#{data[index][:run]}_s_#{data[index][:lane]}\\\\tSM:#{sample_name}\\\\tPL:Illumina\\\\tPU:#{data[index][:lane]}\"'"
 
     lane_shell_vars.each do |v|
-      cmd += " ${#{v}}"
+      cmd += " \\\"${#{v}}\\\""
     end
   end
   return cmd
