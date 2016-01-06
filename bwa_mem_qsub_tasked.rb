@@ -97,4 +97,12 @@ Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
   end
 end
 
+if 0 == return_val
+  delete_files.each do |f|
+    begin
+      File.delete(f) if File.exists?(f)
+    rescue
+    end
+  end
+end
 exit return_val
