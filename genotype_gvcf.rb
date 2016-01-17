@@ -200,7 +200,7 @@ def split_snp_indels(gatk_opts, opts)
     cmd += ['-o', f]
     cmd += ['-selectType', STEPS_DIRS_FILES[:split][:types][i]]
     env = {
-      "JAVA_MEM_OPTS" => "-Xmx#{mem-4}G"
+      "JAVA_MEM_OPTS" => "-Xmx#{mem-5}G"
     }
     sge = {
       threads:1,
