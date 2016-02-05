@@ -270,11 +270,13 @@ end
 
 # output a -L interval file, if we have an interval
 def opt_l_interval(data)
-  if data.first[:interval_file]
-    "-L #{data.first[:interval_file]}"
-  else
-    ""
+  if data.first.has_key?(:interval_file)
+    i = data.first[:interval_file]
+    if (nil != i && "" != i && " " != i)
+      return "-L #{i}"
+    end
   end
+  return ""
 end
 
 def alignment_summary(sample_name,data)
@@ -291,7 +293,7 @@ def variant_call(sample_name,data)
   end
   caller = ""
   bam_dir = "13_final_bam"
-  if data.first[:interval_file] then
+  if data.first.has_key?(:interval_file) then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
     # Finally Haplotypecaller in gVCF mode or is Gvcf mode
