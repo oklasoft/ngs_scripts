@@ -54,6 +54,7 @@ data[:inputs].map! do |i|
       %W/curl -s --retry 3 -f -o #{tmp_file} #{i}/
     when /^o3/
       # swift it
+      # TODO pull out account with .registry & create the OS_STORAGE_URL env
       (container,object)= u.path.scan(/^\/([^\/]+)\/(.*)/)[0]
       %W/swift download -R 3 -o #{tmp_file} #{container} #{object}/
     end
