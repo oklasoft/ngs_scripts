@@ -17,7 +17,8 @@ end
   verbose:false,
   tmp_base:Dir.tmpdir(),
   output_base:Dir.pwd(),
-  reference:nil
+  reference:nil,
+  trim:[],
 }
 
 op = OptionParser.new do |o|
@@ -33,7 +34,9 @@ op = OptionParser.new do |o|
     @options[:output_base] = File.expand_path(t)
   end
 
-
+  o.on("--trim STRING","Trim fastq first using trimmomatic with STRING, can be specified multiple times") do |t|
+    @options[:trim] << t
+  end
 
   o.on("-v","--verbose","Increase verbosity of output") do
     @options[:verbose] = true
@@ -126,6 +129,14 @@ end
 
 return_val = -1
 Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
+  unless @options[:trim].empty?
+    puts "Trimming" if @options[:verbose]
+    if @options[:debug]
+      @options[:trim].each do |t|
+        puts "\t#{t}"
+      end
+    end
+  end
   cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
   cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
 
