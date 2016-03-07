@@ -3,6 +3,7 @@
 require 'tmpdir'
 require 'tempfile'
 require 'uri'
+require 'optparse'
 
 module URI
   class O3 < Generic
@@ -11,10 +12,49 @@ module URI
   @@schemes['O3'] = O3
 end
 
+@options = {
+  debug:false,
+  verbose:false,
+  tmp_base:Dir.tmpdir(),
+  output_base:Dir.pwd(),
+  reference:nil
+}
+
+op = OptionParser.new do |o|
+  o.banner = "Usage: #{File.basename(__FILE__)} -r REF [-t TMP_BASE] [-o OUTPUT_BASE] "
+
+  o.on("-r","--reference FILE","Use FILE as alignment reference to bwa") do |r|
+    @options[:reference] = File.expand_path(r)
+  end
+  o.on("-t","--tmp DIR","Use DIR as base directory for temp working files, defaults to #{@options[:tmp_base]}") do |t|
+    @options[:tmp_base] = File.expand_path(t)
+  end
+  o.on("-o","--out DIR","Use DIR as base directory for final output, defaults to cwd") do |t|
+    @options[:output_base] = File.expand_path(t)
+  end
+
+
+
+  o.on("-v","--verbose","Increase verbosity of output") do
+    @options[:verbose] = true
+  end
+  o.on("-D","--debug","Enable debugging mode, does not actually upload") do
+    @options[:debug] = true
+  end
+  o.on("-h","--help","Show this help message") do
+    puts o
+    exit(0)
+  end
+  o.parse!
+end
+
+unless @options[:reference]
+  $stderr.puts "Missing alignment reference"
+  $stderr.puts op.help()
+  exit(1)
+end
+
 args = ARGV.clone
-tmp_base = args.shift
-output_base = args.shift
-reference = args.shift
 index = (ENV['SGE_TASK_ID']||1).to_i - 1
 threads = (ENV['NSLOTS']) || 1
 
@@ -36,7 +76,7 @@ end
 
 data = groups[index]
 tag = data[:tag]
-output = File.join(output_base,"#{index}.bam")
+output = File.join(@options[:output_base],"#{index}.bam")
 
 delete_files = []
 data[:inputs].map! do |i|
@@ -85,16 +125,18 @@ data[:inputs].map! do |i|
 end
 
 return_val = -1
-Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
-  cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}#{post}"
+Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
+  cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
   cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
 
   puts cmd
   STDOUT.flush
-  if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
-    return_val = 0
-  else
-    return_val = $?.exitstatus
+  unless @options[:debug]
+    if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+      return_val = 0
+    else
+      return_val = $?.exitstatus
+    end
   end
 end
 
