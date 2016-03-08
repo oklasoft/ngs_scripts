@@ -127,7 +127,7 @@ data[:inputs].map! do |i|
   end
 end
 
-return_val = -1
+return_val = 0
 Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
   unless @options[:trim].empty?
     puts "Trimming" if @options[:verbose]
@@ -136,17 +136,52 @@ Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
         puts "\t#{t}"
       end
     end
-  end
-  cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
-  cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
+    trimmed_outputs = data[:inputs].map do |i|
+      f = Tempfile.new("trimmo")
+      f.close
+      tmp_file = f.path + ".gz" #File.extname(base)
+      f.unlink
+      delete_files << tmp_file
+      if "paired" == data[:mode]
+        [tmp_file,"/dev/null"] #second is unpaired about which we do not care
+      else
+        tmp_file
+      end
+    end.flatten
+    t = if "paired" == data[:mode]
+          "trimmomatic_pe"
+        else
+          "trimmomatic_se"
+        end
+    cmd = "#{pre}#{t} -threads #{threads.to_i} -phred33 #{data[:inputs].join(" ")} #{trimmed_outputs.join(" ")} #{@options[:trim].join(" ")}#{post}"
+    puts cmd
+    STDOUT.flush
+    unless @options[:debug]
+      if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+        return_val = 0
+      else
+        return_val = $?.exitstatus
+      end
+    end
+    if 0 != return_val
+      $stderr.puts "Failed to trimmomatic"
+    end
+    data[:inputs] = trimmed_outputs.reject {|i| "/dev/null" == i}
+    pre = ""
+    post = ""
+  end #if have trim
+  if 0 == return_val
+    cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
+    cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
 
-  puts cmd
-  STDOUT.flush
-  unless @options[:debug]
-    if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
-      return_val = 0
-    else
-      return_val = $?.exitstatus
+    puts cmd
+    STDOUT.flush
+    unless @options[:debug]
+      if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+        return_val = 0
+      else
+        return_val = $?.exitstatus
+      end
     end
   end
 end
