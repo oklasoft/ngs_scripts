@@ -149,7 +149,7 @@ module unload fastqc
 module unload btags
 #{aligner_unload_load()}
 module load samtools/1.3
-module load picard/1.141
+module load picard/2.1.0
 module load gatk/3.5-0-g36282e4
 module load fastqc/0.11.1
 
@@ -284,6 +284,22 @@ def alignment_summary(sample_name,data)
   cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
   cmd+=" REFERENCE_SEQUENCE=${GATK_REF}"
+  return cmd
+end
+
+def hs_metrics(sample_name,data)
+  bam_dir = "13_final_bam"
+  cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
+  cmd+=<<EOS.chomp
+picard CollectHsMetrics \\
+  INPUT=#{bam_dir}/#{sample_name}.bam \\
+  OUTPUT=#{bam_dir}/hs_metrics.txt \\
+  VALIDATION_STRINGENCY=LENIENT \\
+  REFERENCE_SEQUENCE=${GATK_REF}
+EOS
+  if data.first.has_key?(:interval_file) then
+    cmd += " \\\n  BAIT_INTERVALS=#{data.first[:interval_file]} \\\n  TARGET_INTERVALS=#{data.first[:interval_file]}"
+  end
   return cmd
 end
 
@@ -1034,7 +1050,7 @@ rm -rf 00_inputs \
 10_recalibrated_bam
 
 # Get some summary stats on the alignment off in the background
-<%= alignment_summary(@sample_name,@data) %>
+<%= hs_metrics(@sample_name,@data) %>
 
 <%= variant_call(@sample_name,@data) %>
 
