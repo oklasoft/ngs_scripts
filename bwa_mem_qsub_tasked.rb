@@ -1,16 +1,11 @@
 #!/usr/bin/env ruby
 
+$:.unshift File.dirname(File.realpath(__FILE__))
 require 'tmpdir'
 require 'tempfile'
 require 'uri'
+require 'uri-o3'
 require 'optparse'
-
-module URI
-  class O3 < Generic
-    USE_REGISTRY = true
-  end
-  @@schemes['O3'] = O3
-end
 
 @options = {
   debug:false,
@@ -91,18 +86,18 @@ data[:inputs].map! do |i|
     tmp_file = f.path + File.extname(base)
     f.unlink
     delete_files << tmp_file
+    env = {}
     cmd = case u.scheme
     when /^https?/
       # curl it
       %W/curl -s --retry 3 -f -o #{tmp_file} #{i}/
     when /^o3/
       # swift it
-      # TODO pull out account with .registry & create the OS_STORAGE_URL env
-      (container,object)= u.path.scan(/^\/([^\/]+)\/(.*)/)[0]
-      %W/swift download -R 3 -o #{tmp_file} #{container} #{object}/
+      env["OS_STORAGE_URL"] = u.os_storage_url
+      %W/swift download -R 3 -o #{tmp_file} #{u.container} #{u.object}/
     end
     puts "Downloading #{i}..."
-    pid = spawn(*cmd,STDOUT=>STDERR)
+    pid = spawn(env,*cmd,STDOUT=>STDERR)
     pid, status = Process.wait2(pid)
     if nil == status
       raise "Unable to start object download"
