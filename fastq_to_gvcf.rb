@@ -293,7 +293,7 @@ def hs_metrics(sample_name,data)
   cmd+=<<EOS.chomp
 picard CollectHsMetrics \\
   INPUT=#{bam_dir}/#{sample_name}.bam \\
-  OUTPUT=#{bam_dir}/hs_metrics.txt \\
+  OUTPUT=#{bam_dir}/#{sample_name}_hs_metrics.txt \\
   VALIDATION_STRINGENCY=LENIENT \\
   REFERENCE_SEQUENCE=${GATK_REF}
 EOS
@@ -317,7 +317,7 @@ def variant_call(sample_name,data)
     export JAVA_MEM_OPTS="-Xmx24G"
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
-    --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
+    --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
     -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
 
     if [ "$?" -ne "0" ]; then
@@ -536,7 +536,7 @@ def covariate_recalibration(sample_name,data)
   qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_recalibrate \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp \\
-   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6 <%= recalibrate_additional_opts %>
+   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 8 <%= recalibrate_additional_opts %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure reclibrating bam"
