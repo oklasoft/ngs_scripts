@@ -273,7 +273,7 @@ def opt_l_interval(data)
   if data.first.has_key?(:interval_file)
     i = data.first[:interval_file]
     if (nil != i && "" != i && " " != i)
-      return "-L #{i}"
+      return "-L #{i} -ip 50"
     end
   end
   return ""
@@ -442,7 +442,7 @@ def indel_realignment(sample_name,data)
     mkdir 06_intervals
     qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_intervals \\
      -l virtual_free=1G,mem_free=1G,h_vmem=20G \\
-     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./#{f} -o ./06_intervals/cleaned.intervals -nt 10
+     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./#{f} -o ./06_intervals/cleaned.intervals -nt 10 #{opt_l_interval(data)}
 
     if [ "$?" -ne "0" ]; then
      echo "Failure with target realigment creation"
@@ -524,7 +524,7 @@ def covariate_recalibration(sample_name,data)
   qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_bqsr \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam \\
-   -o ./08_uncalibated_covariates/recal_data.grp -nct 6 <%= bqsr_additional_opts() %>
+   -o ./08_uncalibated_covariates/recal_data.grp -nct 8 <%= bqsr_additional_opts() %> <%= opt_l_interval(data) %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure counting covariates"
