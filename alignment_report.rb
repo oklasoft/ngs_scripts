@@ -73,14 +73,14 @@ def metric_class(n,c,perc=false)
     end
 
     if perc
-      define_method :formated_val do
-        return "nil" if nil == @val
-        (@val * 100.0).round(2)
+      define_method :formated_val do |fmt|
+        return "NDA" if nil == @val
+        sprintf(fmt,(@val * 100.0).round(2))
       end
     else
-      define_method :formated_val do
-        return "nil" if nil == @val
-        @val.round(2)
+      define_method :formated_val do |fmt|
+        return "NDA" if nil == @val
+        sprintf(fmt,@val.round(2))
       end
     end
   end
@@ -268,6 +268,5 @@ puts "=" * sample_name.length
 METRICS.each do |k,mc|
   m = mc.new(stats[k])
   pass = m.valid? ? " PASS ✅" : " FAIL ❌"
-  #printf("%.32s%7.2f%s\n","#{m.name} #{'.'*40}",m.formated_val,pass)
-  printf("    %28s %7.2f%s\n",m.name,m.formated_val,pass)
+  printf("    %28s %7s%s\n",m.name,m.formated_val("%7.2f"),pass)
 end
