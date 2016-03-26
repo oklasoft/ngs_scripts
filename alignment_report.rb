@@ -248,13 +248,15 @@ end
 
 sample_name = File.basename(@opts[:bam],".bam")
 
-puts sample_name
 stats = demux_stats(@opts[:conf],sample_name)
 stats[:freelk_ratio] = verify_bam_ratio(@opts[:bam],@opts[:vcf])
 stats.merge!(picard_stats(@opts[:bam]))
+
+puts sample_name
+puts "=" * sample_name.length
 METRICS.each do |k,mc|
   m = mc.new(stats[k])
-  pass = m.valid? ? " ✅" : " ❌"
+  pass = m.valid? ? " PASS ✅" : " FAIL ❌"
   #printf("%.32s%7.2f%s\n","#{m.name} #{'.'*40}",m.formated_val,pass)
-  printf("%28s %7.2f%s\n",m.name,m.formated_val,pass)
+  printf("    %28s %7.2f%s\n",m.name,m.formated_val,pass)
 end
