@@ -145,7 +145,10 @@ def demux_stats_from_o3(object_path)
         when Net::HTTPSuccess
           r = {}
           %w/avg-q30 avg-unknown avg-mean-q avg-of-lanes num-lanes/.each do |q|
-            r[q.gsub(/-/,'_').to_sym] = resp["x-object-meta-sequence-run-library-demux-#{q}"].to_f.round(2)
+            h_key = "x-object-meta-sequence-run-library-demux-#{q}"
+            if resp.key?(h_key)
+              r[q.gsub(/-/,'_').to_sym] = resp[h_key].to_f.round(2)
+            end
           end
           return r
         when Net::HTTPUnauthorized, Net::HTTPForbidden
