@@ -164,6 +164,7 @@ end
 # FREELK1/FREELK0
 def verify_bam_ratio(bam_path,vcf_path)
   sm_tsv = verify_bam_sm_path_for(bam_path,vcf_path)
+  return nil if nil == sm_tsv
   d = CSV.read(sm_tsv,{:headers=>true,:col_sep=>"\t",:converters=>:numeric})
   return (d[0]['FREELK1']/d[0]['FREELK0']).round(2)
 end
@@ -179,12 +180,19 @@ def verify_bam_sm_path_for(bam_path,vcf_path)
   cmd = %W/verifyBamID --self --precise --ignoreRG --chip-none --maxDepth 1000 --vcf
           #{vcf_path} --bam #{bam_path} --out #{out}/
 
-  pid = spawn(*cmd,STDOUT=>'/dev/null',STDERR=>'/dev/null')
+  begin
+    pid = spawn(*cmd,STDOUT=>'/dev/null',STDERR=>'/dev/null')
+  rescue Errno::ENOENT
+    $stderr.puts "Missing verifyBamID from $PATH"
+    return nil
+  end
   pid, status = Process.wait2(pid)
   if nil == status
-    raise "Unable to start verifyBamID"
+    $stderr.puts "Unable to start verifyBamID"
+    return nil
   elsif 0 != status.exitstatus
-    raise "Failure verifyBamID #{$?}"
+    $stderr.puts "Failure verifyBamID #{$?}"
+    return nil
   end
   %w/depthSM log/.each do |ext|
     f = "#{out}.#{ext}"
