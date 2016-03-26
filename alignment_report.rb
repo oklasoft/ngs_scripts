@@ -212,6 +212,10 @@ def picard_hs(bam_path,hs,sample_name,conf)
   cmd = %W/picard CollectHsMetrics INPUT=#{bam_path} OUTPUT=#{hs}
            VALIDATION_STRINGENCY=LENIENT REFERENCE_SEQUENCE=#{c['DEFAULT'].first[:gatk_ref]}/
   i_file = c[sample_name].first[:interval_file] || c['DEFAULT'].first[:interval_file]
+  if nil == i_file
+    $stderr.puts "Picard HS metrics requires an interval/bait file"
+    return nil
+  end
   cmd += %W/BAIT_INTERVALS=#{i_file} TARGET_INTERVALS=#{i_file}/
   begin
     pid = spawn(*cmd,STDOUT=>'/dev/null',STDERR=>'/dev/null')
