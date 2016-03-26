@@ -219,6 +219,10 @@ end
 def picard_stats(bam_path)
   b = File.basename(bam_path,".bam")
   hs = File.join(File.dirname(bam_path),"#{b}_hs_metrics.txt")
+  unless File.exist?(hs)
+    $stderr.puts "No picard hs metrics: #{hs}"
+    return {}
+  end
   d = ""
   IO.foreach(hs) do |line|
     if "" != d
