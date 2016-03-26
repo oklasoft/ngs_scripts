@@ -88,7 +88,7 @@ end
 
 
 METRICS = {
-  :number_of_runs => metric_class("BCL Number of Runs", lambda {|x| x < 2}),
+  :number_of_runs => metric_class("BCL Number of Runs", lambda {|x| x < 2 && x > 0}),
   :avg_of_lanes => metric_class("BCL Demux Average % of Lanes", lambda {|x| true}),
   :num_lanes => metric_class("BCL Demux Number of Lanes", lambda {|x| x >= 1 && x <= 4}),
   :avg_q30 => metric_class("BCL Demux Average Q30", lambda {|x| x >= 75.0}),
