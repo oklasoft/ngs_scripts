@@ -140,12 +140,23 @@ def demux_stats_from_o3(object_path)
   req  = Net::HTTP::Head.new(u.request_uri)
   req["X-Auth-Token"] = token
   resp = http.request(req)
-  m = resp.to_hash
-  r = {}
-  %w/avg-q30 avg-unknown avg-mean-q avg-of-lanes num-lanes/.each do |q|
-    r[q.gsub(/-/,'_').to_sym] = m["x-object-meta-sequence-run-library-demux-#{q}"].first.to_f.round(2)
-  end
-  return r
+  msg = case resp
+        when Net::HTTPSuccess
+          r = {}
+          %w/avg-q30 avg-unknown avg-mean-q avg-of-lanes num-lanes/.each do |q|
+            r[q.gsub(/-/,'_').to_sym] = resp["x-object-meta-sequence-run-library-demux-#{q}"].to_f.round(2)
+          end
+          return r
+        when Net::HTTPUnauthorized, Net::HTTPForbidden
+          "Unauthorized, check OS_AUTH_TOKEN"
+        when Net::HTTPNotFound
+          "Object #{object_path} not found"
+        when Net::HTTPServerError
+          "Server Error: #{resp.value}"
+        else
+          "Unknown error: #{resp.value}"
+        end
+  $stderr.puts "O3 Error: #{msg}"
 end
 
 # FREELK1/FREELK0
