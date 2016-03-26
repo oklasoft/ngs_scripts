@@ -158,6 +158,7 @@ def demux_stats_from_o3(object_path)
           "Unknown error: #{resp.value}"
         end
   $stderr.puts "O3 Error: #{msg}"
+  return {}
 end
 
 # FREELK1/FREELK0
