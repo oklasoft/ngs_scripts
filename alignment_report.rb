@@ -115,7 +115,7 @@ def demux_stats(conf,sample_name)
   c = YAML::load_file(conf)[sample_name]
   runs = c.map{|r| demux_stats_from_o3(r[:inputs].first)}.reject {|r| r.empty?}
   results = {
-    :number_of_runs => runs.size
+    :number_of_runs => c.size#runs.size
   }
   return results if runs.empty?
   runs.first.keys.each do |k|
