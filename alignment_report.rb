@@ -204,6 +204,29 @@ def verify_bam_sm_path_for(bam_path,vcf_path)
   return final
 end
 
+def picard_hs(bam_path,hs,sample_name,conf)
+  c = YAML::load_file(conf)
+  cmd = %W/picard CollectHsMetrics INPUT=#{bam_path} OUTPUT=#{hs}
+           VALIDATION_STRINGENCY=LENIENT REFERENCE_SEQUENCE=#{c['DEFAULT'].first[:gatk_ref]}/
+  i_file = c[sample_name].first[:interval_file] || c['DEFAULT'].first[:interval_file]
+  cmd += %W/BAIT_INTERVALS=#{i_file} TARGET_INTERVALS=#{i_file}/
+  begin
+    pid = spawn(*cmd,STDOUT=>'/dev/null',STDERR=>'/dev/null')
+  rescue Errno::ENOENT
+    $stderr.puts "Missing picard from $PATH"
+    return nil
+  end
+  pid, status = Process.wait2(pid)
+  if nil == status
+    $stderr.puts "Unable to start picard"
+    return nil
+  elsif 0 != status.exitstatus
+    $stderr.puts "Failure picard #{$?}"
+    return nil
+  end
+  return hs
+end
+
 # - Percent pass filter unique reads (picard)
 # PCT_PF_UQ_READS
 # - Percent pass filter unique reads aligned to reference (picard)
@@ -216,12 +239,15 @@ end
 # PCT_TARGET_BASES_20X
 # - Percent target bases > 30x (picard)
 # PCT_TARGET_BASES_30X
-def picard_stats(bam_path)
+def picard_stats(bam_path,conf)
   b = File.basename(bam_path,".bam")
   hs = File.join(File.dirname(bam_path),"#{b}_hs_metrics.txt")
   unless File.exist?(hs)
-    $stderr.puts "No picard hs metrics: #{hs}"
-    return {}
+    picard_hs(bam_path,hs,b,conf)
+    unless File.exist?(hs)
+      $stderr.puts "No picard hs metrics: #{hs}"
+      return {}
+    end
   end
   d = ""
   IO.foreach(hs) do |line|
@@ -275,7 +301,7 @@ sample_name = File.basename(@opts[:bam],".bam")
 
 stats = demux_stats(@opts[:conf],sample_name)
 stats[:freelk_ratio] = verify_bam_ratio(@opts[:bam],@opts[:vcf])
-stats.merge!(picard_stats(@opts[:bam]))
+stats.merge!(picard_stats(@opts[:bam],@opts[:conf]))
 
 puts sample_name
 puts "=" * sample_name.length
