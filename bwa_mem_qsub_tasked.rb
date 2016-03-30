@@ -1,20 +1,58 @@
 #!/usr/bin/env ruby
 
+$:.unshift File.dirname(File.realpath(__FILE__))
 require 'tmpdir'
 require 'tempfile'
 require 'uri'
+require 'uri-o3'
+require 'optparse'
 
-module URI
-  class O3 < Generic
-    USE_REGISTRY = true
+@options = {
+  debug:false,
+  verbose:false,
+  tmp_base:Dir.tmpdir(),
+  output_base:Dir.pwd(),
+  reference:nil,
+  trim:[],
+}
+
+op = OptionParser.new do |o|
+  o.banner = "Usage: #{File.basename(__FILE__)} -r REF [-t TMP_BASE] [-o OUTPUT_BASE] "
+
+  o.on("-r","--reference FILE","Use FILE as alignment reference to bwa") do |r|
+    @options[:reference] = File.expand_path(r)
   end
-  @@schemes['O3'] = O3
+  o.on("-t","--tmp DIR","Use DIR as base directory for temp working files, defaults to #{@options[:tmp_base]}") do |t|
+    @options[:tmp_base] = File.expand_path(t)
+  end
+  o.on("-o","--out DIR","Use DIR as base directory for final output, defaults to cwd") do |t|
+    @options[:output_base] = File.expand_path(t)
+  end
+
+  o.on("--trim STRING","Trim fastq first using trimmomatic with STRING, can be specified multiple times") do |t|
+    @options[:trim] << t
+  end
+
+  o.on("-v","--verbose","Increase verbosity of output") do
+    @options[:verbose] = true
+  end
+  o.on("-D","--debug","Enable debugging mode, does not actually upload") do
+    @options[:debug] = true
+  end
+  o.on("-h","--help","Show this help message") do
+    puts o
+    exit(0)
+  end
+  o.parse!
+end
+
+unless @options[:reference]
+  $stderr.puts "Missing alignment reference"
+  $stderr.puts op.help()
+  exit(1)
 end
 
 args = ARGV.clone
-tmp_base = args.shift
-output_base = args.shift
-reference = args.shift
 index = (ENV['SGE_TASK_ID']||1).to_i - 1
 threads = (ENV['NSLOTS']) || 1
 
@@ -36,7 +74,7 @@ end
 
 data = groups[index]
 tag = data[:tag]
-output = File.join(output_base,"#{index}.bam")
+output = File.join(@options[:output_base],"#{index}.bam")
 
 delete_files = []
 data[:inputs].map! do |i|
@@ -48,17 +86,18 @@ data[:inputs].map! do |i|
     tmp_file = f.path + File.extname(base)
     f.unlink
     delete_files << tmp_file
+    env = {}
     cmd = case u.scheme
     when /^https?/
       # curl it
       %W/curl -s --retry 3 -f -o #{tmp_file} #{i}/
     when /^o3/
       # swift it
-      (container,object)= u.path.scan(/^\/([^\/]+)\/(.*)/)[0]
-      %W/swift download -R 3 -o #{tmp_file} #{container} #{object}/
+      env["OS_STORAGE_URL"] = u.os_storage_url
+      %W/swift download -R 3 -o #{tmp_file} #{u.container} #{u.object}/
     end
     puts "Downloading #{i}..."
-    pid = spawn(*cmd,STDOUT=>STDERR)
+    pid = spawn(env,*cmd,STDOUT=>STDERR)
     pid, status = Process.wait2(pid)
     if nil == status
       raise "Unable to start object download"
@@ -83,17 +122,62 @@ data[:inputs].map! do |i|
   end
 end
 
-return_val = -1
-Dir.mktmpdir(index.to_s,tmp_base) do |tmp_prefix_dir|
-  cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{reference} #{data[:inputs].join(" ")}#{post}"
-  cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
+return_val = 0
+Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
+  unless @options[:trim].empty?
+    puts "Trimming" if @options[:verbose]
+    if @options[:debug]
+      @options[:trim].each do |t|
+        puts "\t#{t}"
+      end
+    end
+    trimmed_outputs = data[:inputs].map do |i|
+      f = Tempfile.new("trimmo")
+      f.close
+      tmp_file = f.path + ".gz" #File.extname(base)
+      f.unlink
+      delete_files << tmp_file
+      if "paired" == data[:mode]
+        [tmp_file,"/dev/null"] #second is unpaired about which we do not care
+      else
+        tmp_file
+      end
+    end.flatten
+    t = if "paired" == data[:mode]
+          "trimmomatic_pe"
+        else
+          "trimmomatic_se"
+        end
+    cmd = "#{pre}#{t} -threads #{threads.to_i} -phred33 #{data[:inputs].join(" ")} #{trimmed_outputs.join(" ")} #{@options[:trim].join(" ")}#{post}"
+    puts cmd
+    STDOUT.flush
+    unless @options[:debug]
+      if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+        return_val = 0
+      else
+        return_val = $?.exitstatus
+      end
+    end
+    if 0 != return_val
+      $stderr.puts "Failed to trimmomatic"
+    end
+    data[:inputs] = trimmed_outputs.reject {|i| "/dev/null" == i}
+    pre = ""
+    post = ""
+  end #if have trim
+  if 0 == return_val
+    cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
+    cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
 
-  puts cmd
-  STDOUT.flush
-  if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
-    return_val = 0
-  else
-    return_val = $?.exitstatus
+    puts cmd
+    STDOUT.flush
+    unless @options[:debug]
+      if system "/bin/bash", "-o", "pipefail", "-o", "errexit", "-c", cmd
+        return_val = 0
+      else
+        return_val = $?.exitstatus
+      end
+    end
   end
 end
 

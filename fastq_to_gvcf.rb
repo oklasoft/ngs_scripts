@@ -127,7 +127,7 @@ end
 def aligner_unload_load()
   case mode()
   when :dna
-    "module unload bwa\nmodule load bwa/0.7.12"
+    "module unload bwa\nmodule load bwa/0.7.12\nmodule unload trimmomatic\nmodule load trimmomatic/0.35"
   when :rna
     "module unload star\nmodule load star/2.4.0h"
   end
@@ -149,7 +149,7 @@ module unload fastqc
 module unload btags
 #{aligner_unload_load()}
 module load samtools/1.3
-module load picard/1.141
+module load picard/2.1.0
 module load gatk/3.5-0-g36282e4
 module load fastqc/0.11.1
 
@@ -270,11 +270,13 @@ end
 
 # output a -L interval file, if we have an interval
 def opt_l_interval(data)
-  if data.first[:interval_file]
-    "-L #{data.first[:interval_file]}"
-  else
-    ""
+  if data.first.has_key?(:interval_file)
+    i = data.first[:interval_file]
+    if (nil != i && "" != i && " " != i)
+      return "-L #{i} -ip 50"
+    end
   end
+  return ""
 end
 
 def alignment_summary(sample_name,data)
@@ -285,13 +287,29 @@ def alignment_summary(sample_name,data)
   return cmd
 end
 
+def hs_metrics(sample_name,data)
+  bam_dir = "13_final_bam"
+  cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
+  cmd+=<<EOS.chomp
+picard CollectHsMetrics \\
+  INPUT=#{bam_dir}/#{sample_name}.bam \\
+  OUTPUT=#{bam_dir}/#{sample_name}_hs_metrics.txt \\
+  VALIDATION_STRINGENCY=LENIENT \\
+  REFERENCE_SEQUENCE=${GATK_REF}
+EOS
+  if data.first.has_key?(:interval_file) then
+    cmd += " \\\n  BAIT_INTERVALS=#{data.first[:interval_file]} \\\n  TARGET_INTERVALS=#{data.first[:interval_file]}"
+  end
+  return cmd
+end
+
 def variant_call(sample_name,data)
   if @default_config[:opts][:skip_gvcf]
     return ""
   end
   caller = ""
   bam_dir = "13_final_bam"
-  if data.first[:interval_file] then
+  if data.first.has_key?(:interval_file) then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
     # Finally Haplotypecaller in gVCF mode or is Gvcf mode
@@ -299,7 +317,7 @@ def variant_call(sample_name,data)
     export JAVA_MEM_OPTS="-Xmx24G"
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
-    --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 4 -R ${GATK_REF} \\
+    --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
     -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
 
     if [ "$?" -ne "0" ]; then
@@ -424,7 +442,7 @@ def indel_realignment(sample_name,data)
     mkdir 06_intervals
     qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_intervals \\
      -l virtual_free=1G,mem_free=1G,h_vmem=20G \\
-     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./#{f} -o ./06_intervals/cleaned.intervals -nt 10
+     gatk -T RealignerTargetCreator -R ${GATK_REF} -I ./#{f} -o ./06_intervals/cleaned.intervals -nt 10 #{opt_l_interval(data)}
 
     if [ "$?" -ne "0" ]; then
      echo "Failure with target realigment creation"
@@ -506,7 +524,7 @@ def covariate_recalibration(sample_name,data)
   qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_bqsr \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T BaseRecalibrator -R ${GATK_REF} <%= recalibration_known_sites() %> -I ./07_realigned_bam/cleaned.bam \\
-   -o ./08_uncalibated_covariates/recal_data.grp -nct 6 <%= bqsr_additional_opts() %>
+   -o ./08_uncalibated_covariates/recal_data.grp -nct 8 <%= bqsr_additional_opts() %> <%= opt_l_interval(data) %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure counting covariates"
@@ -518,7 +536,7 @@ def covariate_recalibration(sample_name,data)
   qsub <%= qsub_opts() %> -pe threaded 6 -R y -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_recalibrate \\
    -l virtual_free=1G,mem_free=4G,h_vmem=8G \\
    gatk -T PrintReads -R ${GATK_REF} -I ./07_realigned_bam/cleaned.bam -BQSR ./08_uncalibated_covariates/recal_data.grp \\
-   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 6 <%= recalibrate_additional_opts %>
+   -o ./10_recalibrated_bam/recalibrated.bam --bam_compression 8 -nct 8 <%= recalibrate_additional_opts %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure reclibrating bam"
@@ -573,7 +591,12 @@ end
 def alignment_command(sample_name,data)
   cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
-  cmd += " bwa_mem_qsub_tasked.rb \"${TMP_DIR}\" 03_sorted_bams #{reference_for_data(data)}"
+  cmd += " bwa_mem_qsub_tasked.rb -t \"${TMP_DIR}\" -o 03_sorted_bams -r #{reference_for_data(data)}"
+  if data.first[:opts].has_key?(:trimmomatic)
+    data.first[:opts][:trimmomatic].each do |t|
+      cmd += " --trim #{t}"
+    end
+  end
   @fastq_shell_vars_by_lane.each_with_index do |lane_shell_vars,index|
     if data[index][:is_paired]
       cmd += " paired"
@@ -1027,7 +1050,7 @@ rm -rf 00_inputs \
 10_recalibrated_bam
 
 # Get some summary stats on the alignment off in the background
-<%= alignment_summary(@sample_name,@data) %>
+<%= hs_metrics(@sample_name,@data) %>
 
 <%= variant_call(@sample_name,@data) %>
 
