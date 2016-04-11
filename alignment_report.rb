@@ -8,7 +8,6 @@
 # - Percent undetermined for the demuxed flowcell (bcl2fastq)
 # <=10
 # - Average %Q30 across all lanes for each sample (bcl2fastq)
-sleep .5
 # =75
 # - Average mean Q score across all lanes for each sample (bcl2fastq)
 # =30
