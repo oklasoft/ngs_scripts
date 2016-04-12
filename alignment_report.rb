@@ -327,3 +327,11 @@ METRICS.each do |k,mc|
   pass = m.valid? ? " PASS ✅" : " FAIL ❌"
   printf("    %28s %7s%s\n",m.name,m.formated_val("%7.2f"),pass)
 end
+puts <<EOF
+
+Check Definitions
+=================
+EOF
+METRICS.each do |k,mc|
+  printf("    %28s: %s\n",mc.name,mc.check_to_s)
+end
