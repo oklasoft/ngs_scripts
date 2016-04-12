@@ -48,8 +48,18 @@ require 'csv'
 require 'yaml'
 
 def metric_class(n,c,perc=false)
+  s = eval("lambda {|x| #{c}}")
   Class.new do
+    define_singleton_method :name do
+      n
+    end
+    define_singleton_method :check_to_s do
+      c
+    end
     define_method :check do
+      s
+    end
+    define_method :check_to_s do
       c
     end
     define_method :name do
@@ -65,10 +75,10 @@ def metric_class(n,c,perc=false)
     def valid?
       if nil == @val
         return false
-      elsif nil == check
+      elsif nil == self.check
         ""
       else
-        check.call(@val)
+        self.check.call(@val)
       end
     end
 
@@ -88,19 +98,19 @@ end
 
 
 METRICS = {
-  :number_of_runs => metric_class("BCL Number of Runs", lambda {|x| x < 2 && x > 0}),
-  :avg_of_lanes => metric_class("BCL Demux Average % of Lanes", lambda {|x| x > 0}),
-  :num_lanes => metric_class("BCL Demux Number of Lanes", lambda {|x| x >= 1 && x <= 4}),
-  :avg_q30 => metric_class("BCL Demux Average Q30", lambda {|x| x >= 75.0}),
-  :avg_unknown => metric_class("BCL Demux Average % Unknown",lambda {|x| x <= 10.0}),
-  :avg_mean_q => metric_class("BCL Demux Average Mean Q",lambda {|x| x >= 30.0 }),
-  :freelk_ratio => metric_class("VerifyBam FreeLK Ratio",lambda {|x| x >= 0.90}),
-  :pct_pf_uq_reads => metric_class("Picard % PF UQ Reads",lambda {|x| x >= 0.75}, true),
-  :pct_pf_uq_reads_aligned => metric_class("Picard % PF UQ Reads Aligned",lambda {|x| x >= 0.90}, true),
-  :mean_target_coverage => metric_class("Picard Mean Target Coverage",lambda {|x| x >= 100}),
-  :pct_target_bases_10x => metric_class("Picard % Target Bases 10x",lambda {|x| x >= 0.90}, true),
-  :pct_target_bases_20x => metric_class("Picard % Target Bases 20x",lambda {|x| x >= 0.85}, true),
-  :pct_target_bases_30x => metric_class("Picard % Target Bases 30x",lambda {|x| x >= 0.80}, true),
+  :number_of_runs => metric_class("BCL Number of Runs", "x < 2 && x > 0"),
+  :avg_of_lanes => metric_class("BCL Demux Average % of Lanes", "x > 0"),
+  :num_lanes => metric_class("BCL Demux Number of Lanes", "x >= 1 && x <= 4"),
+  :avg_q30 => metric_class("BCL Demux Average Q30", "x >= 75.0"),
+  :avg_unknown => metric_class("BCL Demux Average % Unknown","x <= 10.0"),
+  :avg_mean_q => metric_class("BCL Demux Average Mean Q","x >= 30.0 "),
+  :freelk_ratio => metric_class("VerifyBam FreeLK Ratio","x >= 0.90"),
+  :pct_pf_uq_reads => metric_class("Picard % PF UQ Reads","x >= 0.75", true),
+  :pct_pf_uq_reads_aligned => metric_class("Picard % PF UQ Reads Aligned","x >= 0.90", true),
+  :mean_target_coverage => metric_class("Picard Mean Target Coverage","x >= 100"),
+  :pct_target_bases_10x => metric_class("Picard % Target Bases 10x","x >= 0.90", true),
+  :pct_target_bases_20x => metric_class("Picard % Target Bases 20x","x >= 0.85", true),
+  :pct_target_bases_30x => metric_class("Picard % Target Bases 30x","x >= 0.80", true),
 }
 
 @opts = {
