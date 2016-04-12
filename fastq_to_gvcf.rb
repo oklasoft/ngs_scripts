@@ -280,7 +280,7 @@ def opt_l_interval(data)
 end
 
 def alignment_summary(sample_name,data)
-  bam_dir = "13_final_bam"
+  bam_dir = "."
   cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
   cmd+=" REFERENCE_SEQUENCE=${GATK_REF}"
@@ -288,7 +288,7 @@ def alignment_summary(sample_name,data)
 end
 
 def hs_metrics(sample_name,data)
-  bam_dir = "13_final_bam"
+  bam_dir = "."
   cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+=<<EOS.chomp
 picard CollectHsMetrics \\
@@ -308,7 +308,7 @@ def variant_call(sample_name,data)
     return ""
   end
   caller = ""
-  bam_dir = "13_final_bam"
+  bam_dir = "."
   if data.first.has_key?(:interval_file) then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
@@ -348,7 +348,7 @@ def gvcf_by_chr(sample_name,data)
   export JAVA_MEM_OPTS="-Xmx16G"
   qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
   -l virtual_free=16G,mem_free=16G,h_vmem=20G haplocaller_qsub_tasked.rb -m 16 -r ${GATK_REF} <%= snprod %> \\
-  -b 15_gvcf -p <%= sample_name %> -i ./13_final_bam/<%= sample_name %>.bam
+  -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam
 
   if [ "$?" -ne "0" ]; then
    echo "Failure GVCFing"
@@ -386,7 +386,7 @@ def fastqc_bam(sample_name,data)
     return <<-EOF
 # fastqc info
 mkdir qc
-qsub #{qsub_opts()} -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_#{sample_name}_qc fastqc -o qc ./13_final_bam/#{sample_name}.bam
+qsub #{qsub_opts()} -p -1000 -l virtual_free=2G,h_vmem=4G -o logs -b y -V -j y -cwd -N a_#{sample_name}_qc fastqc -o qc ./#{sample_name}.bam
     EOF
   else
     return ""
@@ -506,9 +506,8 @@ end
 
 def skip_covariate_recalibration(sample_name,data)
   <<-EOF
-  mkdir 13_final_bam
-  mv ./07_realigned_bam/cleaned.bam ./13_final_bam/#{sample_name}.bam
-  mv ./07_realigned_bam/cleaned.bai ./13_final_bam/#{sample_name}.bai
+  mv ./07_realigned_bam/cleaned.bam ./#{sample_name}.bam
+  mv ./07_realigned_bam/cleaned.bai ./#{sample_name}.bai
   EOF
 end
 
@@ -543,10 +542,8 @@ def covariate_recalibration(sample_name,data)
    exit 1
   fi
 
-  mkdir 13_final_bam
-
-  mv ./10_recalibrated_bam/recalibrated.bam ./13_final_bam/<%= sample_name %>.bam
-  mv ./10_recalibrated_bam/recalibrated.bai ./13_final_bam/<%= sample_name %>.bam.bai
+  mv ./10_recalibrated_bam/recalibrated.bam ./<%= sample_name %>.bam
+  mv ./10_recalibrated_bam/recalibrated.bai ./<%= sample_name %>.bam.bai
 EOF
   ).result(binding)
 end
