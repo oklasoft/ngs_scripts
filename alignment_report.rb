@@ -351,5 +351,7 @@ Check Definitions
 =================
 EOF
 METRICS.each do |k,mc|
-  printf("    %28s: %s\n",mc.name,mc.check_to_s)
+  puts "\n### #{mc.name}"
+  puts " * #{mc.check_to_s}"
+  puts " * #{mc.explanation}"
 end
