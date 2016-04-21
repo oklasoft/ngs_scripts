@@ -84,7 +84,7 @@ unless options[:do_all]
 else
   options[:output_prefix] = File.join(options[:output_base],"#{options[:output_prefix]}")
 end
-cmd += ["-o","#{options[:output_prefix]}.g.vcf"]
+cmd += ["-o","#{options[:output_prefix]}.g.vcf.gz"]
 
 puts cmd.join(" ")
 STDOUT.flush

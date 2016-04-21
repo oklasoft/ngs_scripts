@@ -335,7 +335,7 @@ end
 
 def gvcf_by_chr(sample_name,data)
   chr_gvcfs = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT/.map do |chr|
-    "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.g.vcf"
+    "-V 15_gvcf/by_chr/#{sample_name}-#{chr}.g.vcf.gz"
   end
   snprod = if data.first[:snp_rod] || @default_config[:snp_rod]
     "-d ${GATK_DBSNP}"
@@ -346,7 +346,7 @@ def gvcf_by_chr(sample_name,data)
   # GVCF by chr for better/faster/stronger
   mkdir 15_gvcf
   export JAVA_MEM_OPTS="-Xmx16G"
-  qsub <%= qsub_opts() %> -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
+  qsub <%= qsub_opts() %> -pe threaded 4 -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
   -l virtual_free=16G,mem_free=16G,h_vmem=20G haplocaller_qsub_tasked.rb -m 16 -r ${GATK_REF} <%= snprod %> \\
   -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam
 
