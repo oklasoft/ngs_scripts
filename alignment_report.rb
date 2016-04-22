@@ -129,6 +129,19 @@ METRICS = {
   :pct_target_bases_30x => metric_class("Picard % Target Bases 30x","x >= 0.80",
                                         "The percentages of overall targeted bases that were covered at least 30 times with a unique read. High coverage is needed for accurate variant calling.",
                                         true),
+  :wgs_coverage => metric_class("Illumina Coverage Depth","x >= 30",
+                                       "Illumina's depth of coverage calculation from picard stats"),
+  :mean_coverage => metric_class("Picard Mean Coverage","x >= 100",
+                                       "The mean coverage in bases of the genome territory, after all filters are applied.. High coverage is needed for accurate variant calling."),
+  :pct_10x => metric_class("Picard % Bases 10x","x >= 0.90",
+                                        "The percentage of bases that attained at least 10X sequence coverage in post-filtering bases. High coverage is needed for accurate variant calling.",
+                                        true),
+  :pct_20x => metric_class("Picard % Bases 20x","x >= 0.85",
+                                        "The percentage of bases that attained at least 20X sequence coverage in post-filtering bases. High coverage is needed for accurate variant calling.",
+                                        true),
+  :pct_30x => metric_class("Picard % Bases 30x","x >= 0.80",
+                                        "The percentage of bases that attained at least 30X sequence coverage in post-filtering bases. High coverage is needed for accurate variant calling.",
+                                        true),
 }
 
 @opts = {
@@ -136,7 +149,8 @@ METRICS = {
   :debug => true,
   :conf => nil,
   :bam => nil,
-  :vcf => nil
+  :vcf => nil,
+  :mode => :wes,
 }
 
 def demux_stats(conf,sample_name)
@@ -235,16 +249,15 @@ def verify_bam_sm_path_for(bam_path,vcf_path)
   return final
 end
 
-def picard_hs(bam_path,hs,sample_name,conf)
-  c = YAML::load_file(conf)
-  cmd = %W/picard CollectHsMetrics INPUT=#{bam_path} OUTPUT=#{hs}
-           VALIDATION_STRINGENCY=LENIENT REFERENCE_SEQUENCE=#{c['DEFAULT'].first[:gatk_ref]}/
-  i_file = c[sample_name].first[:interval_file] || c['DEFAULT'].first[:interval_file]
-  if nil == i_file
-    $stderr.puts "Picard HS metrics requires an interval/bait file"
-    return nil
-  end
-  cmd += %W/BAIT_INTERVALS=#{i_file} TARGET_INTERVALS=#{i_file}/
+def picard_hs_ws(bam_path,o,mode,ref,i_file)
+  metric,extra = if :wgs == mode
+                   ["CollectWgsMetrics",nil]
+                 elsif :hs == mode
+                   ["CollectHsMetrics",%W/BAIT_INTERVALS=#{i_file} TARGET_INTERVALS=#{i_file}/]
+                 end
+  cmd = %W/picard #{metric} INPUT=#{bam_path} OUTPUT=#{o}
+           VALIDATION_STRINGENCY=LENIENT REFERENCE_SEQUENCE=#{ref}/
+  cmd += extra if extra
   begin
     pid = spawn(*cmd,STDOUT=>'/dev/null',STDERR=>'/dev/null')
   rescue Errno::ENOENT
@@ -259,7 +272,7 @@ def picard_hs(bam_path,hs,sample_name,conf)
     $stderr.puts "Failure picard #{$?}"
     return nil
   end
-  return hs
+  return o
 end
 
 # - Percent pass filter unique reads (picard)
@@ -276,26 +289,55 @@ end
 # PCT_TARGET_BASES_30X
 def picard_stats(bam_path,conf)
   b = File.basename(bam_path,".bam")
-  hs = File.join(File.dirname(bam_path),"#{b}_hs_metrics.txt")
-  unless File.exist?(hs)
-    picard_hs(bam_path,hs,b,conf)
-    unless File.exist?(hs)
-      $stderr.puts "No picard hs metrics: #{hs}"
+  c = YAML::load_file(conf)
+  picard_mode = if :wgs == @opts[:mode]
+             :wgs
+           else
+             :hs
+           end
+  i_file = nil
+  if :hs == picard_mode
+    i_file = c[b].first[:interval_file] || c['DEFAULT'].first[:interval_file]
+    if nil == i_file
+      $stderr.puts "Exome requires interval file for picard metrics"
+      return {}
+    end
+  end
+  out = File.join(File.dirname(bam_path),"#{b}_#{picard_mode.to_s}_metrics.txt")
+  unless File.exist?(out)
+    picard_hs_ws(bam_path,out,picard_mode,c['DEFAULT'].first[:gatk_ref],i_file)
+    unless File.exist?(out)
+      $stderr.puts "No picard hs/ws metrics: #{out}"
       return {}
     end
   end
   d = ""
-  IO.foreach(hs) do |line|
+  IO.foreach(out) do |line|
     if "" != d
       d << line
+      break
     end
-    next unless line =~ /\ABAIT_SET/
+    case picard_mode
+    when :hs
+      next unless line =~ /\ABAIT_SET/
+    when :wgs
+      next unless line =~ /\AGENOME_TERRITORY/
+    end
     d << line
   end
   c = CSV.parse(d,{:headers=>true,:col_sep=>"\t",:converters=>:numeric})
   r = {}
-  %w/PCT_PF_UQ_READS PCT_PF_UQ_READS_ALIGNED MEAN_TARGET_COVERAGE PCT_TARGET_BASES_10X PCT_TARGET_BASES_20X PCT_TARGET_BASES_30X/.each do |k|
+  keys = case picard_mode
+    when :hs
+      %w/PCT_PF_UQ_READS PCT_PF_UQ_READS_ALIGNED MEAN_TARGET_COVERAGE PCT_TARGET_BASES_10X PCT_TARGET_BASES_20X PCT_TARGET_BASES_30X/
+    when :wgs
+      %w/MEAN_COVERAGE PCT_10X PCT_20X PCT_30X PCT_EXC_DUPE PCT_EXC_OVERLAP PCT_EXC_TOTAL/
+    end
+  keys.each do |k|
     r[k.downcase.to_sym] = c[0][k].round(2)
+  end
+  if :wgs == picard_mode
+    r[:wgs_coverage] = (r[:mean_coverage] * (1.0 - r[:pct_exc_dupe] - r[:pct_exc_overlap]) ) / ( 1.0 - r[:pct_exc_total])
   end
   return r
 end
@@ -311,6 +353,14 @@ op = OptionParser.new do |o|
   o.on("-h","--help","Show this help message") do
     puts o
     exit(0)
+  end
+  o.on("-m","--mode [MODE]",%w/wes wgs/,"Set reporting mode (wes, wgs), default wes") do |m|
+    if nil == m
+      $stderr.puts "Unknown mode #{m}"
+      $stderr.puts o.help
+      exit(1)
+    end
+    @opts[:mode] = m.to_sym
   end
   o.on("-c","--conf YAML","Load YAML for analysis conf, for fastq source") do |y|
     @opts[:conf] = File.expand_path(y)
@@ -332,6 +382,17 @@ end
   end
 end
 
+removes = case @opts[:mode]
+when :wes
+  %w/pct_30x pct_20x pct_10x mean_coverage wgs_coverage/
+when :wgs
+  %w/pct_target_bases_30x pct_target_bases_20x pct_target_bases_10x pct_pf_uq_reads mean_target_coverage pct_pf_uq_reads_aligned/
+else
+  $stderr.puts "Invalid alignment mode: #{@pts[:mode]}"
+  $stderr.puts op.help()
+  exit(1)
+end.map{|x| x.to_sym}
+
 sample_name = File.basename(@opts[:bam],".bam")
 
 stats = demux_stats(@opts[:conf],sample_name)
@@ -341,6 +402,7 @@ stats.merge!(picard_stats(@opts[:bam],@opts[:conf]))
 puts sample_name
 puts "=" * sample_name.length
 METRICS.each do |k,mc|
+  next if removes.include?(k)
   m = mc.new(stats[k])
   pass = m.valid? ? " PASS ✅" : " FAIL ❌"
   printf("    %28s %7s%s\n",m.name,m.formated_val("%7.2f"),pass)
@@ -351,6 +413,7 @@ Check Definitions
 =================
 EOF
 METRICS.each do |k,mc|
+  next if removes.include?(k)
   puts "\n### #{mc.name}"
   puts " * #{mc.check_to_s}"
   puts " * #{mc.explanation}"
