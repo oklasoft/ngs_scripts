@@ -118,6 +118,8 @@ def main()
         case File.extname(lib[:paths].first)
         when /\.gz\z/i
           cmd += ["--readFilesCommand", "zcat"]
+        when /\.xz\z/i
+          cmd += ["--readFilesCommand", "xzcat"]
         end
         cmd += %W/--runThreadN #{threads}/
 
@@ -156,6 +158,8 @@ def main()
         case File.extname(lib[:paths].first)
         when /\.gz\z/i
           cmd += ["--readFilesCommand", "zcat"]
+        when /\.xz\z/i
+          cmd += ["--readFilesCommand", "xzcat"]
         end
         cmd += %W/--runThreadN #{threads}/
 
