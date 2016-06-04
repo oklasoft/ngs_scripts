@@ -742,7 +742,7 @@ def run_real
                       :mode => nil,
                       :opts=>{
                         :skip_gvcf => false,
-                        :skip_indel_realign => false,
+                        :skip_indel_realign => true,
                         :fastqc_bam => false,
                         :fastqc_fastq => false
                       }
