@@ -150,7 +150,7 @@ module unload btags
 #{aligner_unload_load()}
 module load samtools/1.3
 module load picard/2.1.0
-module load gatk/3.5-0-g36282e4
+module load gatk/3.6-g89b7209
 module load fastqc/0.11.1
 
 set -o pipefail
