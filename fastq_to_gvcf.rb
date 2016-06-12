@@ -150,7 +150,7 @@ module unload btags
 #{aligner_unload_load()}
 module load samtools/1.3
 module load picard/2.1.0
-module load gatk/3.5-0-g36282e4
+module load gatk/3.6-g89b7209
 module load fastqc/0.11.1
 
 set -o pipefail
@@ -699,8 +699,8 @@ end
 
 
 class AnalysisTemplaterApp
-VERSION       = "4.3.1"
-REVISION_DATE = "20160415"
+VERSION       = "4.4.0"
+REVISION_DATE = "20160612"
 AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
 COPYRIGHT     = "Copyright (c) 2012-2016 Oklahoma Medical Research Foundation"
 
@@ -742,7 +742,7 @@ def run_real
                       :mode => nil,
                       :opts=>{
                         :skip_gvcf => false,
-                        :skip_indel_realign => false,
+                        :skip_indel_realign => true,
                         :fastqc_bam => false,
                         :fastqc_fastq => false
                       }

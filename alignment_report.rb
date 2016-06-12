@@ -178,8 +178,6 @@ def demux_stats_from_o3(object_path)
   http = Net::HTTP.new(u.host, u.port)
   http.use_ssl=true
   http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-  http.open_timeout = 2
-  http.read_timeout = 15
   req  = Net::HTTP::Head.new(u.request_uri)
   req["X-Auth-Token"] = token
   resp = http.request(req)
