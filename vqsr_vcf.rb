@@ -122,7 +122,7 @@ def variant_recalibrator(data,input_vcf,base_vcf_name)
 end
 
 def make_plots(data,input_vcf,base_vcf_name)
-  cmd = %w/R CMD BATCH/
+  cmd = %w/R CMD BATCH --no-save/
   cmd += [vqsr_output_file(base_vcf_name,"R"), vqsr_output_file(base_vcf_name,"Rout")]
   run_command("R",cmd)
 end
