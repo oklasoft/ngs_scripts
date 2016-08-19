@@ -699,8 +699,8 @@ end
 
 
 class AnalysisTemplaterApp
-VERSION       = "4.4.0"
-REVISION_DATE = "20160612"
+VERSION       = "4.4.1"
+REVISION_DATE = "20160819"
 AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
 COPYRIGHT     = "Copyright (c) 2012-2016 Oklahoma Medical Research Foundation"
 
