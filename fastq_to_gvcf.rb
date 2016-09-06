@@ -345,9 +345,8 @@ def gvcf_by_chr(sample_name,data)
   ERB.new(<<-EOF
   # GVCF by chr for better/faster/stronger
   mkdir 15_gvcf
-  export JAVA_MEM_OPTS="-Xmx16G"
-  qsub <%= qsub_opts() %> -pe threaded 4 -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
-  -l virtual_free=16G,mem_free=16G,h_vmem=20G haplocaller_qsub_tasked.rb -m 16 -r ${GATK_REF} <%= snprod %> \\
+  qsub <%= qsub_opts() %> -pe threaded 6 -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
+  -l virtual_free=2G,mem_free=2G,h_vmem=6G haplocaller_qsub_tasked.rb -m 24 -r ${GATK_REF} <%= snprod %> \\
   -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam
 
   if [ "$?" -ne "0" ]; then
@@ -586,7 +585,7 @@ def reference_for_data(data)
 end
 
 def alignment_command(sample_name,data)
-  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
+  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=2G,mem_free=2G,h_vmem=5G,heavy_io=0.08 -o logs -sync y"
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
   cmd += " bwa_mem_qsub_tasked.rb -t \"${TMP_DIR}\" -o 03_sorted_bams -r #{reference_for_data(data)}"
   if data.first[:opts].has_key?(:trimmomatic)
