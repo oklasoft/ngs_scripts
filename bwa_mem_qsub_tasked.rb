@@ -7,6 +7,8 @@ require 'uri'
 require 'uri-o3'
 require 'optparse'
 
+MAX_DOWNLOAD_TRIES = 3
+
 @options = {
   debug:false,
   verbose:false,
@@ -14,6 +16,7 @@ require 'optparse'
   output_base:Dir.pwd(),
   reference:nil,
   trim:[],
+  download_timeout:0,
 }
 
 op = OptionParser.new do |o|
@@ -31,6 +34,11 @@ op = OptionParser.new do |o|
 
   o.on("--trim STRING","Trim fastq first using trimmomatic with STRING, can be specified multiple times") do |t|
     @options[:trim] << t
+  end
+
+  o.on("--download-timeout INT",OptionParser::DecimalInteger,"Timeout file download after INT seconds, then retry, defaults to 0 (no timeout)") do |t|
+    require 'timeout'
+    @options[:download_timeout] = t
   end
 
   o.on("-v","--verbose","Increase verbosity of output") do
@@ -81,12 +89,11 @@ data[:inputs].map! do |i|
   if i =~ /^(https?|o3):\/\//
     u = URI(i)
     base = File.basename(u.path)
-    f = Tempfile.new(base)
+    f = Tempfile.new(base,@options[:tmp_base])
     f.close
     tmp_file = f.path + File.extname(base)
     f.unlink
     delete_files << tmp_file
-    env = {}
     cmd = case u.scheme
     when /^https?/
       # curl it
@@ -96,9 +103,24 @@ data[:inputs].map! do |i|
       env["OS_STORAGE_URL"] = u.os_storage_url
       %W/swift download -R 3 -o #{tmp_file} #{u.container} #{u.object}/
     end
-    puts "Downloading #{i}..."
-    pid = spawn(env,*cmd,STDOUT=>STDERR)
-    pid, status = Process.wait2(pid)
+    attempt = 0
+    keep_trying = true
+    while keep_trying && attempt < MAX_DOWNLOAD_TRIES do
+      puts "Downloading (attempt #{attempt}) #{i}..."
+      pid = spawn(env,*cmd,STDOUT=>STDERR,pgroup:true)
+      status = nil
+      begin
+        Timeout::timeout(@options[:download_timeout]) do
+        pid, status = Process.wait2(pid)
+        keep_trying = false
+        break
+      end
+      rescue Timeout::Error
+        Process.kill(-15, pid)
+        pid, status = Process.wait2(pid)
+        attempt+=1
+      end
+    end
     if nil == status
       raise "Unable to start object download"
     elsif 0 != status.exitstatus
