@@ -44,7 +44,7 @@ op = OptionParser.new do |o|
     @options[:download_timeout] = t
   end
 
-  o.on("--source-env [FILE]",Shellwords,"Source OS_AUTH_TOKEN from FILE shell env file, defaults to #{@options[:source_env_path]}") do |t|
+  o.on("--source-env [FILE]","Source OS_AUTH_TOKEN from FILE shell env file, defaults to #{@options[:source_env_path]}") do |t|
     @options[:source_env] = true
     @options[:source_env_path] = File.expand_path(t) unless nil == t
   end
@@ -93,7 +93,7 @@ tag = data[:tag]
 output = File.join(@options[:output_base],"#{index}.bam")
 
 env = {}
-if @options[:source_env]
+if @options[:source_env] && File.exist?(@options[:source_env_path])
   # This env parsing section extracted from https://github.com/bkeepers/dotenv
   # This module was MIT licensed Copyright (c) 2012 Brandon Keepers)
   LINE = /
