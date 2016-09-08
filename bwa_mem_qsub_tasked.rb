@@ -92,6 +92,36 @@ data = groups[index]
 tag = data[:tag]
 output = File.join(@options[:output_base],"#{index}.bam")
 
+env = {}
+if @options[:source_env]
+  # This env parsing section extracted from https://github.com/bkeepers/dotenv
+  # This module was MIT licensed Copyright (c) 2012 Brandon Keepers)
+  LINE = /
+        \A
+        (?:export\s+)?    # optional export
+        ([\w\.]+)         # key
+        (?:\s*=\s*|:\s+?) # separator
+        (                 # optional value begin
+          '(?:\'|[^'])*'  #   single quoted value
+          |               #   or
+          "(?:\"|[^"])*"  #   double quoted value
+          |               #   or
+          [^#\n]+         #   unquoted value
+        )?                # value end
+        (?:\s*\#.*)?      # optional comment
+        \z
+      /x
+  File.open(@options[:source_env_path],"rb:bom|utf-8").each do |line|
+    line.chomp!
+    if (match = line.match(LINE))
+      key, value = match.captures
+      next unless key == "OS_AUTH_TOKEN"
+      env[key] = value.strip.sub(/\A(['"])(.*)\1\z/, '\2')
+      break
+    end
+  end
+end
+
 delete_files = []
 data[:inputs].map! do |i|
   if i =~ /^(https?|o3):\/\//
