@@ -281,15 +281,20 @@ end
 
 def hs_metrics(sample_name,data)
   bam_dir = "."
+  picard_mode,metric = if data.first.has_key?(:interval_file) then
+                         [:hs,"CollectHsMetrics"]
+                       else
+                         [:wgs,"CollectWgsMetrics"]
+                       end
   cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+=<<EOS.chomp
-picard CollectHsMetrics \\
+picard #{metric} \\
   INPUT=#{bam_dir}/#{sample_name}.bam \\
-  OUTPUT=#{bam_dir}/#{sample_name}_hs_metrics.txt \\
+  OUTPUT=#{bam_dir}/#{sample_name}_#{picard_mode}_metrics.txt \\
   VALIDATION_STRINGENCY=LENIENT \\
   REFERENCE_SEQUENCE=${GATK_REF}
 EOS
-  if data.first.has_key?(:interval_file) then
+  if :hs == picard_mode then
     cmd += " \\\n  BAIT_INTERVALS=#{data.first[:interval_file]} \\\n  TARGET_INTERVALS=#{data.first[:interval_file]}"
   end
   return cmd
