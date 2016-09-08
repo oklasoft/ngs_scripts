@@ -6,6 +6,7 @@ require 'tempfile'
 require 'uri'
 require 'uri-o3'
 require 'optparse'
+require 'shellwords'
 
 MAX_DOWNLOAD_TRIES = 3
 
@@ -17,6 +18,8 @@ MAX_DOWNLOAD_TRIES = 3
   reference:nil,
   trim:[],
   download_timeout:0,
+  source_env:false,
+  source_env_path:File.expand_path("~/.swiftrc"),
 }
 
 op = OptionParser.new do |o|
@@ -39,6 +42,11 @@ op = OptionParser.new do |o|
   o.on("--download-timeout INT",OptionParser::DecimalInteger,"Timeout file download after INT seconds, then retry, defaults to 0 (no timeout)") do |t|
     require 'timeout'
     @options[:download_timeout] = t
+  end
+
+  o.on("--source-env [FILE]",Shellwords,"Source OS_AUTH_TOKEN from FILE shell env file, defaults to #{@options[:source_env_path]}") do |t|
+    @options[:source_env] = true
+    @options[:source_env_path] = File.expand_path(t) unless nil == t
   end
 
   o.on("-v","--verbose","Increase verbosity of output") do
