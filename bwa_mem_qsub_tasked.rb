@@ -6,7 +6,6 @@ require 'tempfile'
 require 'uri'
 require 'uri-o3'
 require 'optparse'
-require 'shellwords'
 
 MAX_DOWNLOAD_TRIES = 3
 
@@ -145,7 +144,7 @@ data[:inputs].map! do |i|
     keep_trying = true
     while keep_trying && attempt < MAX_DOWNLOAD_TRIES do
       puts "Downloading (attempt #{attempt}) #{i}..."
-      pid = spawn(env,*cmd,STDOUT=>STDERR,pgroup:true)
+      pid = spawn(env,*cmd,STDOUT=>STDERR,pgroup:nil)
       status = nil
       begin
         Timeout::timeout(@options[:download_timeout]) do
@@ -154,7 +153,7 @@ data[:inputs].map! do |i|
         break
       end
       rescue Timeout::Error
-        Process.kill(-15, pid)
+        Process.kill(15, pid)
         pid, status = Process.wait2(pid)
         attempt+=1
       end
