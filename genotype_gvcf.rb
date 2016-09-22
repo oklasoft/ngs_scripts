@@ -183,7 +183,7 @@ def genotype_gvcfs(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"genotypeGVCF", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"genotypeGVCF-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
   Dir.mkdir(STEPS_DIRS_FILES[:genotypegvcf][:dir])
   Dir.chdir(STEPS_DIRS_FILES[:genotypegvcf][:dir]) do
@@ -236,7 +236,7 @@ def vqsr(gatk_opts, opts)
         mem:opts[:mem]/2,
         opts:gatk_opts[:qsub]
       }
-      jobs << { name:"vqsr#{f}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+      jobs << { name:"vqsr#{f}-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
     end
     passed = work(jobs)
     if passed
@@ -269,7 +269,7 @@ def merge_snp_indels(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"merge", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"merge-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
   Dir.mkdir(STEPS_DIRS_FILES[:merge][:dir])
   Dir.chdir(STEPS_DIRS_FILES[:merge][:dir]) do
@@ -293,7 +293,7 @@ def recode(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"recode", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"recode-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
   Dir.mkdir(STEPS_DIRS_FILES[:recode][:dir])
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
@@ -311,14 +311,14 @@ def tabix(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"bgzip", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"bgzip-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
     passed = work(jobs)
   end
   return passed unless passed
   cmd = %W/tabix -f -p vcf #{STEPS_DIRS_FILES[:tabix][:files].first}/
-  jobs << { name:"tabix", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"tabix-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
     passed = work(jobs)
   end
