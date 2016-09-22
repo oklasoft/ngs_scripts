@@ -53,7 +53,7 @@ def parsed_opts(method=:parse)
   }
 
   op = OptionParser.new do |o|
-    o.banner = "Usage: #{File.basename(__FILE__)} -a CONFIG_YAML -c CONTAINER -u SWIFT_URL"
+    o.banner = "Usage: #{File.basename(__FILE__)} -a CONFIG_YAML -i INPUT"
     o.on("-c","--config YAML","Specify project config") do |c|
       options[:conf_file] = File.expand_path c
     end
@@ -64,6 +64,10 @@ def parsed_opts(method=:parse)
 
     o.on("-t","--threads NUM",OptionParser::DecimalInteger,"Run GATK GenotypeGVCFs with NUM threads, default #{options[:threads]}") do |t|
       options[:threads] = t
+    end
+
+    o.on("-d","--min-dp NUM",OptionParser::DecimalInteger,"MinDP value to pass to final vcftools recode, defualt #{options[:dp]}") do |t|
+      options[:dp] = t
     end
 
     o.on("-o","--output BASE","Base output path & name, default #{options[:output_base]}") do |p|
