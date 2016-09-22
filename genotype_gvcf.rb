@@ -116,9 +116,9 @@ def work(jobs)
           mem = if job[:sge][:mem]
                   h=job[:sge][:mem]
                   v=(h/2/job[:sge][:threads]).ceil
-                  v = 1 if v == 0
+                  v = 1 if v <= 1
                   f=(v/2).ceil
-                  f = 1 if f == 0
+                  f = 1 if f <= 1
                   %W/-l h_vmem=#{h}G,virtual_free=#{v}G,mem_free=#{f}G/
                 else
                   []
@@ -175,7 +175,7 @@ def genotype_gvcfs(gatk_opts,opts)
   cmd += opts[:inputs].map {|i| ["-V",i]}.flatten
   cmd += ['-o', STEPS_DIRS_FILES[:genotypegvcf][:files].first ]
   env = {
-    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-4}G"
+    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
   }
   sge = {
     threads:opts[:threads],
@@ -211,7 +211,7 @@ def split_snp_indels(gatk_opts, opts)
       mem:mem,
       opts:gatk_opts[:qsub]
     }
-    jobs << { name:"split#{f}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+    jobs << { name:"split#{f}-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   end
   Dir.mkdir(STEPS_DIRS_FILES[:split][:dir])
   passed = false
@@ -261,7 +261,7 @@ def merge_snp_indels(gatk_opts,opts)
   cmd += STEPS_DIRS_FILES[:vqsr][:files].map {|i| ["-V",File.join("..",STEPS_DIRS_FILES[:vqsr][:dir],i)]}.flatten
   cmd += ['-o', STEPS_DIRS_FILES[:merge][:files].first ]
   env = {
-    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-4}G"
+    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
   }
   sge = {
     threads:opts[:threads],
