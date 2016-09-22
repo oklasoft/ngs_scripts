@@ -170,8 +170,8 @@ def genotype_gvcfs(gatk_opts,opts)
   STEPS_DIRS_FILES[:genotypegvcf][:files] = STEPS_DIRS_FILES[:genotypegvcf][:ext].call(File.basename(opts[:output_base]))
   cmd = %W/gatk -T GenotypeGVCFs
            -R #{gatk_opts[:reference]}
-           -D #{gatk_opts[:snp]}
-           -nt #{opts[:threads]}/
+           -D #{gatk_opts[:snp]}/
+  cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
   cmd += opts[:inputs].map {|i| ["-V",i]}.flatten
   cmd += ['-o', STEPS_DIRS_FILES[:genotypegvcf][:files].first ]
   env = {
@@ -256,8 +256,8 @@ end
 def merge_snp_indels(gatk_opts,opts)
   STEPS_DIRS_FILES[:merge][:files] = STEPS_DIRS_FILES[:merge][:ext].call(File.basename(opts[:output_base]))
   cmd = %W/gatk -T CombineVariants -genotypeMergeOptions UNSORTED --assumeIdenticalSamples
-           -R #{gatk_opts[:reference]}
-           -nt #{opts[:threads]}/
+           -R #{gatk_opts[:reference]}/
+  cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
   cmd += STEPS_DIRS_FILES[:vqsr][:files].map {|i| ["-V",File.join("..",STEPS_DIRS_FILES[:vqsr][:dir],i)]}.flatten
   cmd += ['-o', STEPS_DIRS_FILES[:merge][:files].first ]
   env = {
