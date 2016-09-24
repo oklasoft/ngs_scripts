@@ -120,7 +120,7 @@ def work(jobs)
                    end
           mem = if job[:sge][:mem]
                   h=job[:sge][:mem]
-                  v=(h/2/job[:sge][:threads]).ceil
+                  v=((h*2/3)/job[:sge][:threads]).ceil
                   v = 1 if v <= 1
                   f=(v/2).ceil
                   f = 1 if f <= 1
