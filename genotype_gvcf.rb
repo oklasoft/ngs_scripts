@@ -49,7 +49,8 @@ def parsed_opts(method=:parse)
     mem:90,
     threads:6,
     output_base:"variants",
-    inputs:[]
+    inputs:[],
+    intervals:[],
   }
 
   op = OptionParser.new do |o|
@@ -76,6 +77,10 @@ def parsed_opts(method=:parse)
 
     o.on("-i","--input GVCF",Array,"Input g.vcf file(s) to GenotypeGVCF") do |g|
       options[:inputs] += g.map {|f| File.expand_path f}
+    end
+
+    o.on("-L","--interval INTERVAL",Array,"Intervals option to pass to GenotypeGVCF") do |i|
+      options[:intervals] += i
     end
 
     o.on("-v","--verbose","Output additional verbose information") do |c|
@@ -172,6 +177,7 @@ def genotype_gvcfs(gatk_opts,opts)
            -R #{gatk_opts[:reference]}
            -D #{gatk_opts[:snp]}/
   cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
+  cmd += opts[:intervals].map {|i| ["-L",i]}.flatten
   cmd += opts[:inputs].map {|i| ["-V",i]}.flatten
   cmd += ['-o', STEPS_DIRS_FILES[:genotypegvcf][:files].first ]
   env = {
