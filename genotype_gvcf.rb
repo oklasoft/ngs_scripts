@@ -120,9 +120,9 @@ def work(jobs)
                    end
           mem = if job[:sge][:mem]
                   h=job[:sge][:mem]
-                  v=((h*2/3)/job[:sge][:threads]).ceil
+                  v=((h*0.75)/job[:sge][:threads]).ceil
                   v = 1 if v <= 1
-                  f=(v/2).ceil
+                  f=(v*0.75).ceil
                   f = 1 if f <= 1
                   %W/-l h_vmem=#{h}G,virtual_free=#{v}G,mem_free=#{f}G/
                 else
