@@ -331,7 +331,8 @@ def tabix(gatk_opts,opts)
   return passed
 end
 
-def cleanup()
+def cleanup(opts)
+  return if opts[:debug]
   STEPS_DIRS_FILES.each do |step,dirs_files|
     next if :tabix == step
     dirs_files[:files].each do |f|
@@ -374,7 +375,7 @@ def main
       merge_snp_indels(gatk_opts,options) &&
       recode(gatk_opts,options) &&
       tabix(gatk_opts,options) &&
-      cleanup()
+      cleanup(options)
   end
   unless passed
     exit(1)
