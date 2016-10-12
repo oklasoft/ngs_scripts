@@ -10,7 +10,7 @@
 # Stuart Glenn <Stuart-Glenn@omrf.org>
 #
 # ==Copyright
-#  Copyright (c) 2011 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
+#  Copyright (c) 2011,2016 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
 #  All rights reserved.
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions are met:

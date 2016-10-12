@@ -18,6 +18,9 @@ DEFAULT:
     :skip_indel_realign: false
     :qsub_opts: -q this.q
     :tmp_dir_base: /fast_scratch
+    :haplotype_caller_opts:
+      - --minPruning=1
+      - --minDanglingBranchLength=1
   :vqsr_snp:
     :variant_recalibrator_opts:
       :maxGaussians: 6

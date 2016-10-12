@@ -8,7 +8,7 @@ MOUSE_CHRS = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 X Y M/.map{|c| "
 
 chromosomes = HUMAN_CHRS
 
-options = {:do_all => false, :memory => 16}
+options = {:do_all => false, :memory => 16, :debug=> false}
 optp = OptionParser.new
 optp.banner = "Usage: #{File.basename(__FILE__)} "
 
@@ -69,6 +69,10 @@ cmd = %W/gatk -T HaplotypeCaller
          /
 if options[:dbsnp] then
   cmd += %W/-D #{options[:dbsnp]}/
+end
+
+options[:extra_args].each do |ea|
+  cmd += ea.split(/ /)
 end
 
 unless options[:do_all]
