@@ -91,6 +91,16 @@ def qsub_opts()
   @default_config[:opts][:qsub_opts]
 end
 
+def haplocaller_opts(data)
+  opts = []
+  [data.first[:opts], @default_config[:opts]].each do |d|
+    if d && d.has_key?(:haplotype_caller_opts)
+      return d[:haplotype_caller_opts]
+    end
+  end
+  return []
+end
+
 def tmp_dir_base_opt()
   base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || nil
   if base
@@ -314,7 +324,8 @@ def variant_call(sample_name,data)
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
-    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam \\
+    -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>
 
     if [ "$?" -ne "0" ]; then
      echo "Failure GVCF"
@@ -338,12 +349,13 @@ def gvcf_by_chr(sample_name,data)
   else
     ""
   end
+  extra_args = haplocaller_opts(data).map{|a| " -E \\\"#{a}\\\""}
   ERB.new(<<-EOF
   # GVCF by chr for better/faster/stronger
   mkdir 15_gvcf
   qsub <%= qsub_opts() %> -pe threaded 6 -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
-  -l virtual_free=2G,mem_free=2G,h_vmem=6G haplocaller_qsub_tasked.rb -m 24 -r ${GATK_REF} <%= snprod %> \\
-  -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam
+  -l virtual_free=3G,mem_free=3G,h_vmem=7G haplocaller_qsub_tasked.rb -m 32 -r ${GATK_REF} <%= snprod %> \\
+  -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam <%= extra_args.join(" ") %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure GVCFing"
