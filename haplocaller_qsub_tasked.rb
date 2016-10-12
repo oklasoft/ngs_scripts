@@ -46,6 +46,15 @@ optp.on("-g","--genome ORGANISM",%w/human mouse/,"Select a genome set of chromos
   end
 end
 
+optp.on("-E ARG", "Add extra argument ARG to GATK call") do |arg|
+  options[:extra_args] ||= []
+  options[:extra_args] << arg
+end
+
+optp.on("-D","--debug", "Debugging, print command but do not run") do
+  options[:debug] = true
+end
+
 optp.on("-h","--help") do
   puts optp
   exit
@@ -93,4 +102,4 @@ cmd += ["-o","#{options[:output_prefix]}.g.vcf.gz"]
 puts cmd.join(" ")
 STDOUT.flush
 
-exec *cmd
+exec(*(cmd)) unless options[:debug]
