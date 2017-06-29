@@ -151,7 +151,7 @@ def bash_header()
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # be sure to start with a fresh & known enviroment (hopefully)
-. /usr/local/Modules/default/init/bash
+. /usr/local/analysis/lmod/lmod/init/bash
 module unload samtools
 module unload picard
 module unload gatk
