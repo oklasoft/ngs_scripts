@@ -8,7 +8,7 @@ MOUSE_CHRS = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 X Y M/.map{|c| "
 
 chromosomes = HUMAN_CHRS
 
-options = {:do_all => false, :memory => 16, :debug=> false}
+options = {:do_all => false, :memory => 16, :debug=> false, :extra_args=>[]}
 optp = OptionParser.new
 optp.banner = "Usage: #{File.basename(__FILE__)} "
 
@@ -47,7 +47,6 @@ optp.on("-g","--genome ORGANISM",%w/human mouse/,"Select a genome set of chromos
 end
 
 optp.on("-E ARG", "Add extra argument ARG to GATK call") do |arg|
-  options[:extra_args] ||= []
   options[:extra_args] << arg
 end
 
