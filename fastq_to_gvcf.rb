@@ -92,7 +92,6 @@ def qsub_opts()
 end
 
 def haplocaller_opts(data)
-  opts = []
   [data.first[:opts], @default_config[:opts]].each do |d|
     if d && d.has_key?(:haplotype_caller_opts)
       return d[:haplotype_caller_opts]
@@ -314,7 +313,6 @@ def variant_call(sample_name,data)
     return ""
   end
   caller = ""
-  bam_dir = "."
   if data.first.has_key?(:interval_file) then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
