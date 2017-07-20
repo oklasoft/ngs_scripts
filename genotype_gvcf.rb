@@ -438,6 +438,11 @@ def cleanup(opts)
         File.delete(file+ext) if File.exists?(file+ext)
       end
       begin
+        Dir.glob("#{dirs_files[:dir]}/*").each do |d|
+          if File.directory?(d)
+            FileUtils.remove_entry_secure(d)
+          end
+        end
         Dir.rmdir(dirs_files[:dir])
       rescue SystemCallError
       end
