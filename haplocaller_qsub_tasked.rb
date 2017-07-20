@@ -74,6 +74,8 @@ cmd = %W/gatk -T HaplotypeCaller
          -nct #{threads}
          -R #{options[:reference]}
          -I #{options[:input_bam]}
+         -A MQRankSum
+         -A ReadPosRankSum
          /
 if options[:dbsnp] then
   cmd += %W/-D #{options[:dbsnp]}/
