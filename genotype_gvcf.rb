@@ -54,7 +54,7 @@ def parsed_opts(method=:parse)
     checkpoint:false,
   }
 
-  op = OptionParser.new do |o|
+  _ = OptionParser.new do |o|
     o.banner = "Usage: #{File.basename(__FILE__)} -a CONFIG_YAML -i INPUT"
     o.on("-c","--config YAML","Specify project config") do |c|
       options[:conf_file] = File.expand_path c
