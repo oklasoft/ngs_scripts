@@ -22,10 +22,15 @@ STEPS_DIRS_FILES = {
     types:%w/SNP INDEL/},
   vqsr:{
     dir:"01_split_snp_indel",
-    ext:lambda { |f| "#{f}-vqsr_recalibrated.vcf" },
+    ext:lambda { |f| "#{f}-vqsr-recalibrated.vcf" },
     files:[],
     types:%w/snp indel/},
-  merge:{dir:"02_remerged_vcf", files:[], ext:lambda {|f|["#{f}-vqsr-recalibrated.vcf.gz"]}},
+  filter:{
+    dir:"01_split_snp_indel",
+    ext:lambda { |f| "#{f}-filters.vcf" },
+    files:[],
+    types:%w/snp indel/},
+  merge:{dir:"02_remerged_vcf", files:[], ext:lambda {|f,m|["#{f}-#{m}.vcf.gz"]}},
   recode:{dir:"03_recoded", files:[], ext:lambda {|f,d|["#{f}-removed-mindp#{d}-recoded.vcf"]}},
   tabix:{dir:"03_recoded", files:[], ext:lambda {|f|["#{f}.vcf.gz"]}},
 }
@@ -168,11 +173,25 @@ def extract_gatk_options(file)
   end
   data = data.first
 
+  filtration = if data.has_key?(:filters) && data.has_key?(:vqsr_snp) && data.has_key?(:vqsr_indel)
+                 $stderr.puts "Config with filters and VQSR is not supported"
+                 exit(1)
+               elsif data.has_key?(:filters)
+                 :filter
+               elsif data.has_key?(:vqsr_snp) && data.has_key?(:vqsr_indel)
+                 :vqsr
+               else
+                 $stderr.puts "Missing filter or vqsr in config"
+                 exit(1)
+               end
+
   return {
     conf_file:file,
     reference:data[:gatk_ref],
     snp:data[:snp_rod],
-    qsub:data[:opts][:qsub_opts] || ""
+    qsub:data[:opts][:qsub_opts] || "",
+    filters:data[:filters],
+    filtration:filtration
   }
 end
 
@@ -286,16 +305,61 @@ def vqsr(gatk_opts, opts)
   return passed
 end
 
+def filter(gatk_opts, opts)
+  jobs = Queue.new()
+  passed = false
+  sdf_f = STEPS_DIRS_FILES[:filter]
+  Dir.chdir(sdf_f[:dir]) do
+    STEPS_DIRS_FILES[:split][:files].each_with_index do |f,i|
+      type = sdf_f[:types][i]
+      dir = "#{type}s-filter"
+      outfile = File.join(dir,sdf_f[:ext].call(File.basename(f,".vcf.gz")))
+      sdf_f[:files] << outfile
+      if opts[:checkpoint] && File.exists?(outfile)
+        next
+      end
+      Dir.mkdir dir unless Dir.exists?(dir)
+      cmd = %W/gatk -T VariantFiltration -R #{gatk_opts[:reference]}/
+      #cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
+      cmd += %W/-V #{f} -o #{outfile}/
+      gatk_opts[:filters][type.to_sym].each do |name,exp|
+        cmd += %W/--filterExpression '#{exp}' --filterName #{name}/
+      end
+      env = {
+        "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
+      }
+      sge = {
+        threads:1,
+        mem:opts[:mem],
+        opts:gatk_opts[:qsub]
+      }
+      jobs << { name:"filter#{f}-#{File.basename(opts[:output_base])}",
+                env:env,
+                sge:sge,
+                cmd:cmd,
+                debug:opts[:debug]
+              }
+    end
+    if opts[:checkpoint] && jobs.empty?
+      return true
+    end
+    passed = work(jobs)
+  end # split dir
+  return passed
+end
+
 def merge_snp_indels(gatk_opts,opts)
-  STEPS_DIRS_FILES[:merge][:files] = STEPS_DIRS_FILES[:merge][:ext].call(File.basename(opts[:output_base]))
-  if opts[:checkpoint] && File.exists?(File.join(STEPS_DIRS_FILES[:merge][:dir],STEPS_DIRS_FILES[:merge][:files]))
+  sdf_f = STEPS_DIRS_FILES[gatk_opts[:filtration]]
+  sdf_m = STEPS_DIRS_FILES[:merge]
+  sdf_m[:files] = sdf_m[:ext].call(File.basename(opts[:output_base]), gatk_opts[:filtration])
+  if opts[:checkpoint] && File.exists?(File.join(sdf_m[:dir],sdf_m[:files]))
     return true
   end
   cmd = %W/gatk -T CombineVariants -genotypeMergeOptions UNSORTED --assumeIdenticalSamples --disable_auto_index_creation_and_locking_when_reading_rods
            -R #{gatk_opts[:reference]}/
   cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
-  cmd += STEPS_DIRS_FILES[:vqsr][:files].map {|i| ["-V",File.join("..",STEPS_DIRS_FILES[:vqsr][:dir],i)]}.flatten
-  cmd += ['-o', STEPS_DIRS_FILES[:merge][:files].first ]
+  cmd += sdf_f[:files].map {|i| ["-V",File.join("..",sdf_f[:dir],i)]}.flatten
+  cmd += ['-o', sdf_m[:files].first ]
   env = {
     "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
   }
@@ -307,8 +371,8 @@ def merge_snp_indels(gatk_opts,opts)
   jobs = Queue.new()
   jobs << { name:"merge-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
-  Dir.mkdir(STEPS_DIRS_FILES[:merge][:dir])
-  Dir.chdir(STEPS_DIRS_FILES[:merge][:dir]) do
+  Dir.mkdir(sdf_m[:dir])
+  Dir.chdir(sdf_m[:dir]) do
     passed = work(jobs)
   end
   return passed
@@ -392,6 +456,7 @@ def main
   end
 
   gatk_opts = extract_gatk_options(options[:conf_file])
+  filtration_method = method(gatk_opts[:filtration])
 
   %w/gatk qsub vcftools bgzip tabix/.each do |b|
     unless which(b)
@@ -404,7 +469,7 @@ def main
   Dir.chdir File.dirname options[:output_base] do
     passed = genotype_gvcfs(gatk_opts,options) &&
       split_snp_indels(gatk_opts, options) &&
-      vqsr(gatk_opts, options) &&
+      filtration_method.call(gatk_opts, options) &&
       merge_snp_indels(gatk_opts,options) &&
       recode(gatk_opts,options) &&
       tabix(gatk_opts,options) &&
