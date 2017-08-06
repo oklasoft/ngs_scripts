@@ -158,7 +158,7 @@ module unload fastqc
 #{aligner_unload_load()}
 module load samtools/1.3
 module load picard/2.1.0
-module load gatk/3.7-0-gcfedb67
+module load gatk/3.8-0-ge9d806836
 module load fastqc/0.11.5
 
 set -o pipefail
@@ -321,8 +321,8 @@ def variant_call(sample_name,data)
     export JAVA_MEM_OPTS="-Xmx24G"
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
-    --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
-    -I ./<%= sample_name %>.bam -A MQRankSum -A ReadPosRankSum \\
+    -ERC GVCF -nct 8 -R ${GATK_REF} \\
+    -I ./<%= sample_name %>.bam -A RMSMappingQuality -A MappingQualityRankSumTest -A ReadPosRankSumTest \\
     -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>
 
     if [ "$?" -ne "0" ]; then
