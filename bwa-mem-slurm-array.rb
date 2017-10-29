@@ -68,8 +68,8 @@ unless @options[:reference]
 end
 
 args = ARGV.clone
-index = (ENV['SGE_TASK_ID']||1).to_i - 1
-threads = (ENV['NSLOTS']) || 1
+index = (ENV['SLURM_ARRAY_TASK_ID']||1).to_i - 1
+threads = (ENV['SLURM_CPUS_ON_NODE']) || 2
 
 groups = []
 
@@ -121,7 +121,19 @@ if @options[:source_env] && File.exist?(@options[:source_env_path])
   end
 end
 
-delete_files = []
+@delete_files = []
+def cleanup()
+  @delete_files.each do |f|
+    begin
+      File.delete(f) if File.exists?(f)
+    rescue
+    end
+  end
+end
+%W/INT HUP QUIT ABRT TERM/.each do |s|
+  Signal.trap(s) { cleanup() }
+end
+
 data[:inputs].map! do |i|
   if i =~ /^(https?|o3):\/\//
     u = URI(i)
@@ -130,7 +142,7 @@ data[:inputs].map! do |i|
     f.close
     tmp_file = f.path + File.extname(base)
     f.unlink
-    delete_files << tmp_file
+    @delete_files << tmp_file
     cmd = case u.scheme
     when /^https?/
       # curl it
@@ -195,7 +207,7 @@ Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
       f.close
       tmp_file = f.path + ".gz" #File.extname(base)
       f.unlink
-      delete_files << tmp_file
+      @delete_files << tmp_file
       if "paired" == data[:mode]
         [tmp_file,"/dev/null"] #second is unpaired about which we do not care
       else
@@ -225,7 +237,7 @@ Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
     post = ""
   end #if have trim
   if 0 == return_val
-    cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-2} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
+    cmd = "#{pre}bwa mem -v 1 -M -t #{threads.to_i-1} -R \"#{tag}\" #{@options[:reference]} #{data[:inputs].join(" ")}#{post}"
     cmd += "|samtools view -Shu - | samtools sort -O bam -@ 4 -m 4G -T #{tmp_prefix_dir}/#{index} > #{output}"
 
     puts cmd
@@ -241,11 +253,6 @@ Dir.mktmpdir(index.to_s,@options[:tmp_base]) do |tmp_prefix_dir|
 end
 
 if 0 == return_val
-  delete_files.each do |f|
-    begin
-      File.delete(f) if File.exists?(f)
-    rescue
-    end
-  end
+  cleanup()
 end
 exit return_val
