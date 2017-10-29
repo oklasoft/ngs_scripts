@@ -315,6 +315,7 @@ def variant_call(sample_name,data)
     return ""
   end
   caller = ""
+  bam_dir = "."
   if data.first.has_key?(:interval_file) then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
@@ -596,7 +597,7 @@ def alignment_command(sample_name,data)
   cmd = "sbatch #{scheduler_opts()} -N 1 -c 12 --mem 48 -o logs/slurm-%x.%A.log -W -t 0-23 \\\n"
   cmd += " --array 1-#{total_number_input_sequenced_lanes()} -J a_#{sample_name}_bwa_alignment \\\n"
   cmd += " --wrap \"bwa-mem-slurm-array.rb -o 03_sorted_bams -r #{reference_for_data(data)}"
-  cmd += " bwa-mem-slurm-array.rb --source-env --download-timeout 1800 -t \"${TMP_DIR}\" -o 03_sorted_bams -r #{reference_for_data(data)}"
+  cmd += " --source-env --download-timeout 1800 -t \"${TMP_DIR}\""
   if data.first[:opts].has_key?(:trimmomatic)
     data.first[:opts][:trimmomatic].each do |t|
       cmd += " --trim #{t}"
@@ -616,6 +617,7 @@ def alignment_command(sample_name,data)
       cmd += " \\\"${#{v}}\\\""
     end
   end
+  cmd += "\""
   return cmd
 end
 
