@@ -7,6 +7,8 @@ require 'uri'
 require 'uri-o3'
 require 'optparse'
 
+MAX_DOWNLOAD_TRIES = 3
+
 @options = {
   debug:false,
   verbose:false,
@@ -14,6 +16,9 @@ require 'optparse'
   output_base:Dir.pwd(),
   reference:nil,
   trim:[],
+  download_timeout:0,
+  source_env:false,
+  source_env_path:File.expand_path("~/.swiftrc"),
 }
 
 op = OptionParser.new do |o|
@@ -31,6 +36,16 @@ op = OptionParser.new do |o|
 
   o.on("--trim STRING","Trim fastq first using trimmomatic with STRING, can be specified multiple times") do |t|
     @options[:trim] << t
+  end
+
+  o.on("--download-timeout INT",OptionParser::DecimalInteger,"Timeout file download after INT seconds, then retry, defaults to 0 (no timeout)") do |t|
+    require 'timeout'
+    @options[:download_timeout] = t
+  end
+
+  o.on("--source-env [FILE]","Source OS_AUTH_TOKEN from FILE shell env file, defaults to #{@options[:source_env_path]}") do |t|
+    @options[:source_env] = true
+    @options[:source_env_path] = File.expand_path(t) unless nil == t
   end
 
   o.on("-v","--verbose","Increase verbosity of output") do
@@ -76,17 +91,46 @@ data = groups[index]
 tag = data[:tag]
 output = File.join(@options[:output_base],"#{index}.bam")
 
+env = {}
+if @options[:source_env] && File.exist?(@options[:source_env_path])
+  # This env parsing section extracted from https://github.com/bkeepers/dotenv
+  # This module was MIT licensed Copyright (c) 2012 Brandon Keepers)
+  LINE = /
+        \A
+        (?:export\s+)?    # optional export
+        ([\w\.]+)         # key
+        (?:\s*=\s*|:\s+?) # separator
+        (                 # optional value begin
+          '(?:\'|[^'])*'  #   single quoted value
+          |               #   or
+          "(?:\"|[^"])*"  #   double quoted value
+          |               #   or
+          [^#\n]+         #   unquoted value
+        )?                # value end
+        (?:\s*\#.*)?      # optional comment
+        \z
+      /x
+  File.open(@options[:source_env_path],"rb:bom|utf-8").each do |line|
+    line.chomp!
+    if (match = line.match(LINE))
+      key, value = match.captures
+      next unless key == "OS_AUTH_TOKEN"
+      env[key] = value.strip.sub(/\A(['"])(.*)\1\z/, '\2')
+      break
+    end
+  end
+end
+
 delete_files = []
 data[:inputs].map! do |i|
   if i =~ /^(https?|o3):\/\//
     u = URI(i)
     base = File.basename(u.path)
-    f = Tempfile.new(base)
+    f = Tempfile.new(base,@options[:tmp_base])
     f.close
     tmp_file = f.path + File.extname(base)
     f.unlink
     delete_files << tmp_file
-    env = {}
     cmd = case u.scheme
     when /^https?/
       # curl it
@@ -96,9 +140,24 @@ data[:inputs].map! do |i|
       env["OS_STORAGE_URL"] = u.os_storage_url
       %W/swift download -R 3 -o #{tmp_file} #{u.container} #{u.object}/
     end
-    puts "Downloading #{i}..."
-    pid = spawn(env,*cmd,STDOUT=>STDERR)
-    pid, status = Process.wait2(pid)
+    attempt = 0
+    keep_trying = true
+    while keep_trying && attempt < MAX_DOWNLOAD_TRIES do
+      puts "Downloading (attempt #{attempt}) #{i}..."
+      pid = spawn(env,*cmd,STDOUT=>STDERR,pgroup:nil)
+      status = nil
+      begin
+        Timeout::timeout(@options[:download_timeout]) do
+        pid, status = Process.wait2(pid)
+        keep_trying = false
+        break
+      end
+      rescue Timeout::Error
+        Process.kill(15, pid)
+        pid, status = Process.wait2(pid)
+        attempt+=1
+      end
+    end
     if nil == status
       raise "Unable to start object download"
     elsif 0 != status.exitstatus

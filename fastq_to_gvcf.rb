@@ -36,7 +36,7 @@
 # Stuart Glenn <Stuart-Glenn@omrf.org>
 #
 # ==Copyright
-#  Copyright (c) 2011-2015 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
+#  Copyright (c) 2011-2016 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
 #  All rights reserved.
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions are met:
@@ -91,6 +91,15 @@ def qsub_opts()
   @default_config[:opts][:qsub_opts]
 end
 
+def haplocaller_opts(data)
+  [data.first[:opts], @default_config[:opts]].each do |d|
+    if d && d.has_key?(:haplotype_caller_opts)
+      return d[:haplotype_caller_opts]
+    end
+  end
+  return []
+end
+
 def tmp_dir_base_opt()
   base = @data.first[:opts][:tmp_dir_base] || @default_config[:opts][:tmp_dir_base] || nil
   if base
@@ -141,17 +150,16 @@ def bash_header()
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 # be sure to start with a fresh & known enviroment (hopefully)
-. /usr/local/Modules/default/init/bash
+. /usr/local/analysis/lmod/lmod/init/bash
 module unload samtools
 module unload picard
 module unload gatk
 module unload fastqc
-module unload btags
 #{aligner_unload_load()}
 module load samtools/1.3
 module load picard/2.1.0
-module load gatk/3.6-g89b7209
-module load fastqc/0.11.1
+module load gatk/3.7-0-gcfedb67
+module load fastqc/0.11.5
 
 set -o pipefail
 EOS
@@ -279,25 +287,22 @@ def opt_l_interval(data)
   return ""
 end
 
-def alignment_summary(sample_name,data)
-  bam_dir = "."
-  cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
-  cmd+="picard CollectAlignmentSummaryMetrics INPUT=#{bam_dir}/#{sample_name}.bam OUTPUT=#{bam_dir}/align_summary.txt VALIDATION_STRINGENCY=LENIENT"
-  cmd+=" REFERENCE_SEQUENCE=${GATK_REF}"
-  return cmd
-end
-
 def hs_metrics(sample_name,data)
   bam_dir = "."
+  picard_mode,metric = if data.first.has_key?(:interval_file) then
+                         [:hs,"CollectHsMetrics"]
+                       else
+                         [:wgs,"CollectWgsMetrics"]
+                       end
   cmd="JAVA_MEM_OPTS=\"-Xmx24G\" qsub #{qsub_opts()} -l virtual_free=6G,mem_free=5G,h_vmem=32G -o logs -b y -V -j y -cwd -N a_#{sample_name}_alignment_summary \\\n"
   cmd+=<<EOS.chomp
-picard CollectHsMetrics \\
+picard #{metric} \\
   INPUT=#{bam_dir}/#{sample_name}.bam \\
-  OUTPUT=#{bam_dir}/#{sample_name}_hs_metrics.txt \\
+  OUTPUT=#{bam_dir}/#{sample_name}_#{picard_mode}_metrics.txt \\
   VALIDATION_STRINGENCY=LENIENT \\
   REFERENCE_SEQUENCE=${GATK_REF}
 EOS
-  if data.first.has_key?(:interval_file) then
+  if :hs == picard_mode then
     cmd += " \\\n  BAIT_INTERVALS=#{data.first[:interval_file]} \\\n  TARGET_INTERVALS=#{data.first[:interval_file]}"
   end
   return cmd
@@ -308,7 +313,6 @@ def variant_call(sample_name,data)
     return ""
   end
   caller = ""
-  bam_dir = "."
   if data.first.has_key?(:interval_file) then
     # if we have an interval file, just do it with that
     caller = ERB.new(<<-EOF
@@ -318,7 +322,8 @@ def variant_call(sample_name,data)
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
-    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %>
+    -I ./<%= sample_name %>.bam -A MQRankSum -A ReadPosRankSum \\
+    -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>
 
     if [ "$?" -ne "0" ]; then
      echo "Failure GVCF"
@@ -342,13 +347,13 @@ def gvcf_by_chr(sample_name,data)
   else
     ""
   end
+  extra_args = haplocaller_opts(data).map{|a| " -E \\\"#{a}\\\""}
   ERB.new(<<-EOF
   # GVCF by chr for better/faster/stronger
   mkdir 15_gvcf
-  export JAVA_MEM_OPTS="-Xmx16G"
-  qsub <%= qsub_opts() %> -pe threaded 4 -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
-  -l virtual_free=16G,mem_free=16G,h_vmem=20G haplocaller_qsub_tasked.rb -m 16 -r ${GATK_REF} <%= snprod %> \\
-  -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam
+  qsub <%= qsub_opts() %> -pe threaded 6 -t 1-25 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_gvcf_by_chr \\
+  -l virtual_free=3G,mem_free=3G,h_vmem=7G haplocaller_qsub_tasked.rb -m 32 -r ${GATK_REF} <%= snprod %> \\
+  -b 15_gvcf -p <%= sample_name %> -i ./<%= sample_name %>.bam <%= extra_args.join(" ") %>
 
   if [ "$?" -ne "0" ]; then
    echo "Failure GVCFing"
@@ -586,9 +591,9 @@ def reference_for_data(data)
 end
 
 def alignment_command(sample_name,data)
-  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=1G,mem_free=1G,h_vmem=48G -o logs -sync y"
+  cmd = "qsub #{qsub_opts()} -pe threaded 12 -l virtual_free=2G,mem_free=2G,h_vmem=5G,heavy_io=0.08 -o logs -sync y"
   cmd += " -t 1-#{total_number_input_sequenced_lanes()} -b y -V -j y -cwd -N a_#{sample_name}_bwa_alignment"
-  cmd += " bwa_mem_qsub_tasked.rb -t \"${TMP_DIR}\" -o 03_sorted_bams -r #{reference_for_data(data)}"
+  cmd += " bwa_mem_qsub_tasked.rb --source-env --download-timeout 1800 -t \"${TMP_DIR}\" -o 03_sorted_bams -r #{reference_for_data(data)}"
   if data.first[:opts].has_key?(:trimmomatic)
     data.first[:opts][:trimmomatic].each do |t|
       cmd += " --trim #{t}"
@@ -699,8 +704,8 @@ end
 
 
 class AnalysisTemplaterApp
-VERSION       = "4.4.1"
-REVISION_DATE = "20160819"
+VERSION       = "4.5.1"
+REVISION_DATE = "20161012"
 AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
 COPYRIGHT     = "Copyright (c) 2012-2016 Oklahoma Medical Research Foundation"
 

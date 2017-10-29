@@ -8,7 +8,7 @@ MOUSE_CHRS = %w/1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 X Y M/.map{|c| "
 
 chromosomes = HUMAN_CHRS
 
-options = {:do_all => false, :memory => 16}
+options = {:do_all => false, :memory => 16, :debug=> false, :extra_args=>[]}
 optp = OptionParser.new
 optp.banner = "Usage: #{File.basename(__FILE__)} "
 
@@ -46,6 +46,14 @@ optp.on("-g","--genome ORGANISM",%w/human mouse/,"Select a genome set of chromos
   end
 end
 
+optp.on("-E ARG", "Add extra argument ARG to GATK call") do |arg|
+  options[:extra_args] << arg
+end
+
+optp.on("-D","--debug", "Debugging, print command but do not run") do
+  options[:debug] = true
+end
+
 optp.on("-h","--help") do
   puts optp
   exit
@@ -66,9 +74,15 @@ cmd = %W/gatk -T HaplotypeCaller
          -nct #{threads}
          -R #{options[:reference]}
          -I #{options[:input_bam]}
+         -A MQRankSum
+         -A ReadPosRankSum
          /
 if options[:dbsnp] then
   cmd += %W/-D #{options[:dbsnp]}/
+end
+
+options[:extra_args].each do |ea|
+  cmd += ea.split(/ /)
 end
 
 unless options[:do_all]
@@ -89,4 +103,4 @@ cmd += ["-o","#{options[:output_prefix]}.g.vcf.gz"]
 puts cmd.join(" ")
 STDOUT.flush
 
-exec *cmd
+exec(*(cmd)) unless options[:debug]

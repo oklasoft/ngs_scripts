@@ -10,7 +10,7 @@
 # Stuart Glenn <Stuart-Glenn@omrf.org>
 #
 # ==Copyright
-#  Copyright (c) 2011 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
+#  Copyright (c) 2011,2016 Stuart Glenn, Oklahoma Medical Research Foundation. (OMRF)
 #  All rights reserved.
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions are met:
@@ -179,7 +179,7 @@ def load_config_data(config_path)
 end
 
 def output_version(out)
-  out.puts "#{File.basename($0)} 1.0"
+  out.puts "#{File.basename(__FILE__)} Version: 4.5.1 Released: 20161012"
 end
 
 def output_help(out)

@@ -22,10 +22,15 @@ STEPS_DIRS_FILES = {
     types:%w/SNP INDEL/},
   vqsr:{
     dir:"01_split_snp_indel",
-    ext:lambda { |f| "#{f}-vqsr_recalibrated.vcf" },
+    ext:lambda { |f| "#{f}-vqsr-recalibrated.vcf" },
     files:[],
     types:%w/snp indel/},
-  merge:{dir:"02_remerged_vcf", files:[], ext:lambda {|f|["#{f}-vqsr-recalibrated.vcf.gz"]}},
+  filter:{
+    dir:"01_split_snp_indel",
+    ext:lambda { |f| "#{f}-filters.vcf" },
+    files:[],
+    types:%w/snp indel/},
+  merge:{dir:"02_remerged_vcf", files:[], ext:lambda {|f,m|["#{f}-#{m}.vcf.gz"]}},
   recode:{dir:"03_recoded", files:[], ext:lambda {|f,d|["#{f}-removed-mindp#{d}-recoded.vcf"]}},
   tabix:{dir:"03_recoded", files:[], ext:lambda {|f|["#{f}.vcf.gz"]}},
 }
@@ -49,11 +54,13 @@ def parsed_opts(method=:parse)
     mem:90,
     threads:6,
     output_base:"variants",
-    inputs:[]
+    inputs:[],
+    intervals:[],
+    checkpoint:false,
   }
 
-  op = OptionParser.new do |o|
-    o.banner = "Usage: #{File.basename(__FILE__)} -a CONFIG_YAML -c CONTAINER -u SWIFT_URL"
+  _ = OptionParser.new do |o|
+    o.banner = "Usage: #{File.basename(__FILE__)} -a CONFIG_YAML -i INPUT"
     o.on("-c","--config YAML","Specify project config") do |c|
       options[:conf_file] = File.expand_path c
     end
@@ -66,6 +73,10 @@ def parsed_opts(method=:parse)
       options[:threads] = t
     end
 
+    o.on("-d","--min-dp NUM",OptionParser::DecimalInteger,"MinDP value to pass to final vcftools recode, defualt #{options[:dp]}") do |t|
+      options[:dp] = t
+    end
+
     o.on("-o","--output BASE","Base output path & name, default #{options[:output_base]}") do |p|
       options[:output_base] = File.expand_path p
     end
@@ -74,8 +85,16 @@ def parsed_opts(method=:parse)
       options[:inputs] += g.map {|f| File.expand_path f}
     end
 
+    o.on("-L","--interval INTERVAL",Array,"Intervals option to pass to GenotypeGVCF") do |i|
+      options[:intervals] += i
+    end
+
     o.on("-v","--verbose","Output additional verbose information") do |c|
       options[:verbose] = true
+    end
+
+    o.on("-C","--checkpoint","Checkpointing for existing output files") do |c|
+      options[:checkpoint] = true
     end
 
     o.on("-D","--debug","Debugging mode, does not actually upload") do |c|
@@ -111,10 +130,10 @@ def work(jobs)
                    end
           mem = if job[:sge][:mem]
                   h=job[:sge][:mem]
-                  v=(h/2/job[:sge][:threads]).ceil
-                  v = 1 if v == 0
-                  f=(v/2).ceil
-                  f = 1 if f == 0
+                  v=((h*0.75)/job[:sge][:threads]).ceil
+                  v = 1 if v <= 1
+                  f=(v*0.75).ceil
+                  f = 1 if f <= 1
                   %W/-l h_vmem=#{h}G,virtual_free=#{v}G,mem_free=#{f}G/
                 else
                   []
@@ -154,24 +173,43 @@ def extract_gatk_options(file)
   end
   data = data.first
 
+  filtration = if data.has_key?(:filters) && data.has_key?(:vqsr_snp) && data.has_key?(:vqsr_indel)
+                 $stderr.puts "Config with filters and VQSR is not supported"
+                 exit(1)
+               elsif data.has_key?(:filters)
+                 :filter
+               elsif data.has_key?(:vqsr_snp) && data.has_key?(:vqsr_indel)
+                 :vqsr
+               else
+                 $stderr.puts "Missing filter or vqsr in config"
+                 exit(1)
+               end
+
   return {
     conf_file:file,
     reference:data[:gatk_ref],
     snp:data[:snp_rod],
-    qsub:data[:opts][:qsub_opts] || ""
+    qsub:data[:opts][:qsub_opts] || "",
+    filters:data[:filters],
+    filtration:filtration
   }
 end
 
 def genotype_gvcfs(gatk_opts,opts)
-  STEPS_DIRS_FILES[:genotypegvcf][:files] = STEPS_DIRS_FILES[:genotypegvcf][:ext].call(File.basename(opts[:output_base]))
-  cmd = %W/gatk -T GenotypeGVCFs
+  stage = :genotypegvcf
+  STEPS_DIRS_FILES[stage][:files] = STEPS_DIRS_FILES[stage][:ext].call(File.basename(opts[:output_base]))
+  if opts[:checkpoint] && STEPS_DIRS_FILES[stage][:files].all?{|f| File.exists?(File.join(STEPS_DIRS_FILES[stage][:dir],f))} then
+    return true
+  end
+  cmd = %W/gatk -T GenotypeGVCFs --disable_auto_index_creation_and_locking_when_reading_rods
            -R #{gatk_opts[:reference]}
-           -D #{gatk_opts[:snp]}
-           -nt #{opts[:threads]}/
+           -D #{gatk_opts[:snp]}/
+  cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
+  cmd += opts[:intervals].map {|i| ["-L",i]}.flatten
   cmd += opts[:inputs].map {|i| ["-V",i]}.flatten
-  cmd += ['-o', STEPS_DIRS_FILES[:genotypegvcf][:files].first ]
+  cmd += ['-o', STEPS_DIRS_FILES[stage][:files].first ]
   env = {
-    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-4}G"
+    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
   }
   sge = {
     threads:opts[:threads],
@@ -179,10 +217,10 @@ def genotype_gvcfs(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"genotypeGVCF", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"genotypeGVCF-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
-  Dir.mkdir(STEPS_DIRS_FILES[:genotypegvcf][:dir])
-  Dir.chdir(STEPS_DIRS_FILES[:genotypegvcf][:dir]) do
+  Dir.mkdir(STEPS_DIRS_FILES[stage][:dir]) unless Dir.exists?(STEPS_DIRS_FILES[stage][:dir])
+  Dir.chdir(STEPS_DIRS_FILES[stage][:dir]) do
     passed = work(jobs)
   end
   return passed
@@ -194,7 +232,10 @@ def split_snp_indels(gatk_opts, opts)
   jobs = Queue.new()
   mem = (opts[:mem]/2).ceil
   STEPS_DIRS_FILES[:split][:files].each_with_index do |f,i|
-    cmd = %W/gatk -T SelectVariants -U LENIENT_VCF_PROCESSING
+    if opts[:checkpoint] && File.exists?(File.join(STEPS_DIRS_FILES[:split][:dir],f))
+      next
+    end
+    cmd = %W/gatk -T SelectVariants -U LENIENT_VCF_PROCESSING --disable_auto_index_creation_and_locking_when_reading_rods
              -R #{gatk_opts[:reference]} -V/
     cmd << File.join("..",STEPS_DIRS_FILES[:genotypegvcf][:dir],input_file)
     cmd += ['-o', f]
@@ -207,9 +248,12 @@ def split_snp_indels(gatk_opts, opts)
       mem:mem,
       opts:gatk_opts[:qsub]
     }
-    jobs << { name:"split#{f}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+    jobs << { name:"split#{f}-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   end
-  Dir.mkdir(STEPS_DIRS_FILES[:split][:dir])
+  if opts[:checkpoint] && jobs.empty?
+    return true
+  end
+  Dir.mkdir(STEPS_DIRS_FILES[:split][:dir]) unless Dir.exists?(STEPS_DIRS_FILES[:split][:dir])
   passed = false
   Dir.chdir(STEPS_DIRS_FILES[:split][:dir]) do
     passed = work(jobs)
@@ -224,15 +268,27 @@ def vqsr(gatk_opts, opts)
     STEPS_DIRS_FILES[:split][:files].each_with_index do |f,i|
       type = STEPS_DIRS_FILES[:vqsr][:types][i]
       dir = "#{type}s_vqsr"
-      Dir.mkdir dir
-      STEPS_DIRS_FILES[:vqsr][:files] << File.join(dir,STEPS_DIRS_FILES[:vqsr][:ext].call(File.basename(f,".vcf.gz")))
+      outfile = File.join(dir,STEPS_DIRS_FILES[:vqsr][:ext].call(File.basename(f,".vcf.gz")))
+      STEPS_DIRS_FILES[:vqsr][:files] << outfile
+      if opts[:checkpoint] && File.exists?(outfile)
+        next
+      end
+      Dir.mkdir dir unless Dir.exists?(dir)
       cmd = %W/vqsr_vcf.rb -c #{opts[:conf_file]} -i #{f} -m #{type} -o #{dir}/
       sge = {
         threads:1,
         mem:opts[:mem]/2,
         opts:gatk_opts[:qsub]
       }
-      jobs << { name:"vqsr#{f}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+      jobs << { name:"vqsr#{f}-#{File.basename(opts[:output_base])}",
+                env:{},
+                  sge:sge,
+                  cmd:cmd,
+                  debug:opts[:debug]
+              }
+    end
+    if opts[:checkpoint] && jobs.empty?
+      return true
     end
     passed = work(jobs)
     if passed
@@ -249,15 +305,63 @@ def vqsr(gatk_opts, opts)
   return passed
 end
 
+def filter(gatk_opts, opts)
+  jobs = Queue.new()
+  passed = false
+  sdf_f = STEPS_DIRS_FILES[:filter]
+  Dir.chdir(sdf_f[:dir]) do
+    STEPS_DIRS_FILES[:split][:files].each_with_index do |f,i|
+      type = sdf_f[:types][i]
+      dir = "#{type}s-filter"
+      outfile = File.join(dir,sdf_f[:ext].call(File.basename(f,".vcf.gz")))
+      sdf_f[:files] << outfile
+      if opts[:checkpoint] && File.exists?(outfile)
+        next
+      end
+      Dir.mkdir dir unless Dir.exists?(dir)
+      cmd = %W/gatk -T VariantFiltration -R #{gatk_opts[:reference]}/
+      #cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
+      cmd += %W/-V #{f} -o #{outfile}/
+      gatk_opts[:filters][type.to_sym].each do |name,exp|
+        cmd += %W/--filterExpression '#{exp}' --filterName #{name}/
+      end
+      env = {
+        "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
+      }
+      sge = {
+        threads:1,
+        mem:opts[:mem],
+        opts:gatk_opts[:qsub]
+      }
+      jobs << { name:"filter#{f}-#{File.basename(opts[:output_base])}",
+                env:env,
+                sge:sge,
+                cmd:cmd,
+                debug:opts[:debug]
+              }
+    end
+    if opts[:checkpoint] && jobs.empty?
+      return true
+    end
+    passed = work(jobs)
+  end # split dir
+  return passed
+end
+
 def merge_snp_indels(gatk_opts,opts)
-  STEPS_DIRS_FILES[:merge][:files] = STEPS_DIRS_FILES[:merge][:ext].call(File.basename(opts[:output_base]))
-  cmd = %W/gatk -T CombineVariants -genotypeMergeOptions UNSORTED --assumeIdenticalSamples
-           -R #{gatk_opts[:reference]}
-           -nt #{opts[:threads]}/
-  cmd += STEPS_DIRS_FILES[:vqsr][:files].map {|i| ["-V",File.join("..",STEPS_DIRS_FILES[:vqsr][:dir],i)]}.flatten
-  cmd += ['-o', STEPS_DIRS_FILES[:merge][:files].first ]
+  sdf_f = STEPS_DIRS_FILES[gatk_opts[:filtration]]
+  sdf_m = STEPS_DIRS_FILES[:merge]
+  sdf_m[:files] = sdf_m[:ext].call(File.basename(opts[:output_base]), gatk_opts[:filtration])
+  if opts[:checkpoint] && File.exists?(File.join(sdf_m[:dir],sdf_m[:files]))
+    return true
+  end
+  cmd = %W/gatk -T CombineVariants -genotypeMergeOptions UNSORTED --assumeIdenticalSamples --disable_auto_index_creation_and_locking_when_reading_rods
+           -R #{gatk_opts[:reference]}/
+  cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
+  cmd += sdf_f[:files].map {|i| ["-V",File.join("..",sdf_f[:dir],i)]}.flatten
+  cmd += ['-o', sdf_m[:files].first ]
   env = {
-    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-4}G"
+    "JAVA_MEM_OPTS" => "-Xmx#{opts[:mem]-6}G"
   }
   sge = {
     threads:opts[:threads],
@@ -265,10 +369,10 @@ def merge_snp_indels(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"merge", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"merge-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
-  Dir.mkdir(STEPS_DIRS_FILES[:merge][:dir])
-  Dir.chdir(STEPS_DIRS_FILES[:merge][:dir]) do
+  Dir.mkdir(sdf_m[:dir])
+  Dir.chdir(sdf_m[:dir]) do
     passed = work(jobs)
   end
   return passed
@@ -276,6 +380,9 @@ end
 
 def recode(gatk_opts,opts)
   STEPS_DIRS_FILES[:recode][:files] = STEPS_DIRS_FILES[:recode][:ext].call(File.basename(STEPS_DIRS_FILES[:merge][:files].first,".vcf.gz"),opts[:dp])
+  if opts[:checkpoint] && File.exists?(File.join(STEPS_DIRS_FILES[:recode][:dir],STEPS_DIRS_FILES[:recode][:files]))
+    return true
+  end
   input = File.join("..",STEPS_DIRS_FILES[:merge][:dir],STEPS_DIRS_FILES[:merge][:files].first)
   cmd = %W/vcftools --gzvcf #{input} --minDP #{opts[:dp]} --recode-INFO-all
            --recode --keep-INFO-all --stdout/
@@ -289,7 +396,7 @@ def recode(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"recode", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"recode-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
   Dir.mkdir(STEPS_DIRS_FILES[:recode][:dir])
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
@@ -307,21 +414,22 @@ def tabix(gatk_opts,opts)
     opts:gatk_opts[:qsub]
   }
   jobs = Queue.new()
-  jobs << { name:"bgzip", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"bgzip-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
   passed = false
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
     passed = work(jobs)
   end
   return passed unless passed
   cmd = %W/tabix -f -p vcf #{STEPS_DIRS_FILES[:tabix][:files].first}/
-  jobs << { name:"tabix", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"tabix-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
     passed = work(jobs)
   end
   return passed
 end
 
-def cleanup()
+def cleanup(opts)
+  return if opts[:debug]
   STEPS_DIRS_FILES.each do |step,dirs_files|
     next if :tabix == step
     dirs_files[:files].each do |f|
@@ -330,6 +438,11 @@ def cleanup()
         File.delete(file+ext) if File.exists?(file+ext)
       end
       begin
+        Dir.glob("#{dirs_files[:dir]}/*").each do |d|
+          if File.directory?(d)
+            FileUtils.remove_entry_secure(d)
+          end
+        end
         Dir.rmdir(dirs_files[:dir])
       rescue SystemCallError
       end
@@ -348,6 +461,7 @@ def main
   end
 
   gatk_opts = extract_gatk_options(options[:conf_file])
+  filtration_method = method(gatk_opts[:filtration])
 
   %w/gatk qsub vcftools bgzip tabix/.each do |b|
     unless which(b)
@@ -360,11 +474,11 @@ def main
   Dir.chdir File.dirname options[:output_base] do
     passed = genotype_gvcfs(gatk_opts,options) &&
       split_snp_indels(gatk_opts, options) &&
-      vqsr(gatk_opts, options) &&
+      filtration_method.call(gatk_opts, options) &&
       merge_snp_indels(gatk_opts,options) &&
       recode(gatk_opts,options) &&
       tabix(gatk_opts,options) &&
-      cleanup()
+      cleanup(options)
   end
   unless passed
     exit(1)
