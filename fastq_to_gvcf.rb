@@ -707,7 +707,7 @@ end
 
 
 class AnalysisTemplaterApp
-VERSION       = "4.5.2-clia"
+VERSION       = "4.6.0-clia"
 REVISION_DATE = "20171029"
 AUTHOR        = "Stuart Glenn <Stuart-Glenn@omrf.org>"
 COPYRIGHT     = "Copyright (c) 2012-2017 Oklahoma Medical Research Foundation"
