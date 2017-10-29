@@ -179,7 +179,7 @@ def load_config_data(config_path)
 end
 
 def output_version(out)
-  out.puts "#{File.basename(__FILE__)} Version: 4.5.1 Released: 20161012"
+  out.puts "#{File.basename(__FILE__)} Version: 4.5.2-clia Released: 20171029"
 end
 
 def output_help(out)
