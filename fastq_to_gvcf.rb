@@ -325,7 +325,8 @@ def variant_call(sample_name,data)
     sbatch <%= scheduler_opts() %> -N 1 -n 1 -c 8 -o logs/slurm-%x.%A.log -W -J a_<%= sample_name %>_variants \\
     --mem 28 --wrap "gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
-    -I ./<%= bam_dir %>/<%= sample_name %>.bam -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>"
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam -A MQRankSum -A ReadPosRankSum \\
+    -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>"
 
     if [ "$?" -ne "0" ]; then
      echo "Failure GVCF"
