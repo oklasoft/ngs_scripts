@@ -322,7 +322,7 @@ def variant_call(sample_name,data)
     qsub <%= qsub_opts() %> -pe threaded 4 -o logs -sync y -b y -V -j y -cwd -N a_<%= sample_name %>_variants \\
     -l virtual_free=3G,mem_free=3G,h_vmem=28G gatk -T HaplotypeCaller \\
     --pair_hmm_implementation VECTOR_LOGLESS_CACHING -ERC GVCF -nct 8 -R ${GATK_REF} \\
-    -I ./<%= sample_name %>.bam -A MQRankSum -A ReadPosRankSum \\
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam \\
     -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>
 
     if [ "$?" -ne "0" ]; then
