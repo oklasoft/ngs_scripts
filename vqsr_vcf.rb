@@ -275,9 +275,9 @@ Dir.chdir(@options.output_base_dir) do
       apply_recalibration(@vqsr_opts,@options.input_vcf_path,base_vcf_name)
       exit(1)
     else
-      FileUtils.move(vqsr_output_file(base_vcf_name,"R.pdf"),File.join("..","#{base_vcf_name}-vqsr-recalibrated.pdf"))
+      FileUtils.move(vqsr_output_file(base_vcf_name,"R.pdf"),File.join("..","..","#{base_vcf_name}-vqsr-recalibrated.pdf"))
       if File.exists?(File.join(vqsr_output_file(base_vcf_name,"tranches.pdf")))
-        FileUtils.move(vqsr_output_file(base_vcf_name,"tranches.pdf"),File.join("..","#{base_vcf_name}-vqsr-recalibrated-tranches.pdf"))
+        FileUtils.move(vqsr_output_file(base_vcf_name,"tranches.pdf"),File.join("..","..","#{base_vcf_name}-vqsr-recalibrated-tranches.pdf"))
       end
     end
   end
