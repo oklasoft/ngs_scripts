@@ -121,31 +121,25 @@ def work(jobs)
   workers = jobs.size.times.map do |job|
     Thread.new do
       begin
-        prefix = %W/qsub -V -sync y -b y -j y -m e -cwd/
+        prefix = %W/sbatch -W -N 1 -n 1 -o slurm-%x.%A.log/
         while job = jobs.pop(true)
           thread = if job[:sge][:threads] && job[:sge][:threads] > 1
-                     %W/-pe threaded #{job[:sge][:threads]}/
+                     %W/-c #{job[:sge][:threads]}/
                    else
-                     []
+                     %W/-c 1/
                    end
           mem = if job[:sge][:mem]
-                  h=job[:sge][:mem]
-                  v=((h*0.75)/job[:sge][:threads]).ceil
-                  v = 1 if v <= 1
-                  f=(v*0.75).ceil
-                  f = 1 if f <= 1
-                  %W/-l h_vmem=#{h}G,virtual_free=#{v}G,mem_free=#{f}G/
+                  %W/--mem #{job[:sge][:mem]}/
                 else
                   []
                 end
-          cmd = prefix + thread + mem + job[:sge][:opts].split(/ /)+ %W/-N #{job[:name]}/ + [job[:cmd].join(" ")]
-          if job[:debug]
-            puts cmd.inspect
-          else
+          cmd = prefix + thread + mem + job[:sge][:opts].split(/ /)+ %W/-J #{job[:name]} --wrap/ + [job[:cmd].join(" ")]
+          puts cmd.inspect if job[:verbose]
+          unless job[:debug]
             pid = spawn(job[:env], *cmd,STDOUT=>STDERR)
             pid, status = Process.wait2(pid)
             if nil == status
-              STDERR.puts "Unable to start qsub"
+              STDERR.puts "Unable to start sbatch"
               passed = false
             elsif 0 != status.exitstatus
               STDERR.puts "Failed to run #{job[:cmd]}: #{$?}"
@@ -189,7 +183,7 @@ def extract_gatk_options(file)
     conf_file:file,
     reference:data[:gatk_ref],
     snp:data[:snp_rod],
-    qsub:data[:opts][:qsub_opts] || "",
+    scheduler:data[:opts][:scheduler_opts] || "",
     filters:data[:filters],
     filtration:filtration
   }
@@ -214,10 +208,10 @@ def genotype_gvcfs(gatk_opts,opts)
   sge = {
     threads:opts[:threads],
     mem:opts[:mem],
-    opts:gatk_opts[:qsub]
+    opts:gatk_opts[:scheduler]
   }
   jobs = Queue.new()
-  jobs << { name:"genotypeGVCF-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"genotypeGVCF-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug], verbose:opts[:verbose] }
   passed = false
   Dir.mkdir(STEPS_DIRS_FILES[stage][:dir]) unless Dir.exists?(STEPS_DIRS_FILES[stage][:dir])
   Dir.chdir(STEPS_DIRS_FILES[stage][:dir]) do
@@ -246,9 +240,9 @@ def split_snp_indels(gatk_opts, opts)
     sge = {
       threads:1,
       mem:mem,
-      opts:gatk_opts[:qsub]
+      opts:gatk_opts[:scheduler]
     }
-    jobs << { name:"split#{f}-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+    jobs << { name:"split#{f}-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug], verbose:opts[:verbose] }
   end
   if opts[:checkpoint] && jobs.empty?
     return true
@@ -278,13 +272,13 @@ def vqsr(gatk_opts, opts)
       sge = {
         threads:1,
         mem:opts[:mem]/2,
-        opts:gatk_opts[:qsub]
+        opts:gatk_opts[:scheduler]
       }
       jobs << { name:"vqsr#{f}-#{File.basename(opts[:output_base])}",
                 env:{},
                   sge:sge,
                   cmd:cmd,
-                  debug:opts[:debug]
+                  debug:opts[:debug], verbose:opts[:verbose]
               }
     end
     if opts[:checkpoint] && jobs.empty?
@@ -331,13 +325,13 @@ def filter(gatk_opts, opts)
       sge = {
         threads:1,
         mem:opts[:mem],
-        opts:gatk_opts[:qsub]
+        opts:gatk_opts[:scheduler]
       }
       jobs << { name:"filter#{f}-#{File.basename(opts[:output_base])}",
                 env:env,
                 sge:sge,
                 cmd:cmd,
-                debug:opts[:debug]
+                debug:opts[:debug], verbose:opts[:verbose]
               }
     end
     if opts[:checkpoint] && jobs.empty?
@@ -366,10 +360,10 @@ def merge_snp_indels(gatk_opts,opts)
   sge = {
     threads:opts[:threads],
     mem:opts[:mem],
-    opts:gatk_opts[:qsub]
+    opts:gatk_opts[:scheduler]
   }
   jobs = Queue.new()
-  jobs << { name:"merge-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"merge-#{File.basename(opts[:output_base])}", env:env, sge:sge, cmd:cmd, debug:opts[:debug], verbose:opts[:verbose] }
   passed = false
   Dir.mkdir(sdf_m[:dir])
   Dir.chdir(sdf_m[:dir]) do
@@ -393,10 +387,10 @@ def recode(gatk_opts,opts)
   sge = {
     threads:1,
     mem:opts[:mem],
-    opts:gatk_opts[:qsub]
+    opts:gatk_opts[:scheduler]
   }
   jobs = Queue.new()
-  jobs << { name:"recode-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"recode-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug], verbose:opts[:verbose] }
   passed = false
   Dir.mkdir(STEPS_DIRS_FILES[:recode][:dir])
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
@@ -411,17 +405,17 @@ def tabix(gatk_opts,opts)
   sge = {
     threads:1,
     mem:opts[:mem]/2,
-    opts:gatk_opts[:qsub]
+    opts:gatk_opts[:scheduler]
   }
   jobs = Queue.new()
-  jobs << { name:"bgzip-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"bgzip-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug], verbose:opts[:verbose] }
   passed = false
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
     passed = work(jobs)
   end
   return passed unless passed
   cmd = %W/tabix -f -p vcf #{STEPS_DIRS_FILES[:tabix][:files].first}/
-  jobs << { name:"tabix-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug] }
+  jobs << { name:"tabix-#{File.basename(opts[:output_base])}", env:{}, sge:sge, cmd:cmd, debug:opts[:debug], verbose:opts[:verbose] }
   Dir.chdir(STEPS_DIRS_FILES[:recode][:dir]) do
     passed = work(jobs)
   end
@@ -441,6 +435,8 @@ def cleanup(opts)
         Dir.glob("#{dirs_files[:dir]}/*").each do |d|
           if File.directory?(d)
             FileUtils.remove_entry_secure(d)
+          elsif File.basename(d) =~ /\Aslurm-.*-#{File.basename(opts[:output_base])}\.[0-9]+\.log\Z/
+            File.delete(d)
           end
         end
         Dir.rmdir(dirs_files[:dir])
@@ -463,7 +459,7 @@ def main
   gatk_opts = extract_gatk_options(options[:conf_file])
   filtration_method = method(gatk_opts[:filtration])
 
-  %w/gatk qsub vcftools bgzip tabix/.each do |b|
+  %w/gatk sbatch vcftools bgzip tabix/.each do |b|
     unless which(b)
       STDERR.puts "Unable to find #{b} in PATH"
       exit(1)
