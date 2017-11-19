@@ -15,7 +15,6 @@ DEFAULT:
   :mode: dna
   :opts:
     :skip_gvcf: false
-<<<<<<< HEAD
     :skip_indel_realign: true
     :scheduler_opts: "-A an-account -p a-queue"
     :tmp_dir_base: "/scratch"
