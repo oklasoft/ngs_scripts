@@ -1,26 +1,38 @@
 ---
 DEFAULT:
-- :bwa_ref: /Volumes/hts_core/Shared/gatk_resources/2.3/b37/bwa_7_6_indexed/human_g1k_v37.fasta
-  :gatk_ref: /Volumes/hts_core/Shared/gatk_resources/2.3/b37/bwa_7_6_indexed/human_g1k_v37.fasta
-  :snp_rod: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz
-  :interval_file: ../../../metadata/01_intervals/sureselect_v5_utr_targets_with_decoy.interval_list
+- :bwa_ref: "/Shared/gatk_resources/2.8/human_g1k_v37.fasta"
+  :gatk_ref: "/Shared/gatk_resources/2.8/human_g1k_v37.fasta"
+  :snp_rod: "/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz"
+  :interval_file: "/Shared/clinical_research_exome_S06588914_Covered.interval_list"
   :known_indels:
-  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/1000G_phase1.indels.b37.vcf.gz
-  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+  - "/Shared/gatk_resources/2.8/b37/1000G_phase1.indels.b37.vcf.gz"
+  - "/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz"
   :recalibration_known_sites:
-  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz
-  - /Volumes/hts_core/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+  - "/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz"
+  - "/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz"
   :keep_unaligned: false
   :quality_type: Standard
   :mode: dna
   :opts:
     :skip_gvcf: false
+<<<<<<< HEAD
+    :skip_indel_realign: true
+    :qsub_opts: "-q a_queue"
+    :tmp_dir_base: "/tmp"
+    :trimmomatic:
+    - ILLUMINACLIP:/Shared/clinical_adapter_clips.fa:4:10:10:8:true
+    - LEADING:5
+    - TRAILING:5
+    - SLIDINGWINDOW:4:15
+    - MINLEN:100
+=======
     :skip_indel_realign: false
     :qsub_opts: -q this.q
     :tmp_dir_base: /fast_scratch
     :haplotype_caller_opts:
       - --minPruning=1
       - --minDanglingBranchLength=1
+>>>>>>> origin/master
   :vqsr_snp:
     :variant_recalibrator_opts:
       :maxGaussians: 6
@@ -31,15 +43,19 @@ DEFAULT:
     :training_sets:
     - :name: hapmap
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/hapmap_3.3.b37.vcf.gz
+      :path: "/Shared/gatk_resources/2.8/b37/hapmap_3.3.b37.vcf.gz"
       :params: known=false,training=true,truth=true,prior=15.0
     - :name: omni
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/1000G_omni2.5.b37.vcf.gz
+      :path: "/Shared/gatk_resources/2.8/b37/1000G_omni2.5.b37.vcf.gz"
       :params: known=false,training=true,truth=false,prior=12.0
+    - :name: 1000G
+      :type: VCF
+      :path: "/Shared/gatk_resources/2.8/b37/1000G_phase1.snps.high_confidence.b37.vcf.gz"
+      :params: known=false,training=true,truth=false,prior=10.0
     - :name: dbsnp
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz
+      :path: "/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz"
       :params: known=true,training=false,truth=false,prior=6.0
     :annotations:
     - MQRankSum
@@ -47,6 +63,7 @@ DEFAULT:
     - FS
     - DP
     - QD
+    - SOR
   :vqsr_indel:
     :variant_recalibrator_opts:
       :maxGaussians: 4
@@ -58,23 +75,31 @@ DEFAULT:
     :training_sets:
     - :name: mills
       :type: VCF
-      :path: /Volumes/hts_core/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+      :path: "/Shared/gatk_resources/2.8/b37/Mills_and_1000G_gold_standard.indels.b37.vcf.gz"
       :params: known=true,training=true,truth=true,prior=12.0
+    - :name: dbsnp
+      :type: VCF
+      :path: "/Shared/gatk_resources/2.8/b37/dbsnp_138.b37.vcf.gz"
+      :params: known=true,training=false,truth=false,prior=2.0
     :annotations:
     - MQRankSum
     - ReadPosRankSum
     - FS
     - DP
-test: 
-- :run: "001"
-  :inputs: 
-  - /somepath/s_1_1_sequence.txt.gz
-  - /somepath/s_1_2_sequence.txt.gz
+    - QD
+    - SOR
+NA08752:
+- :run: a-run-name
   :is_paired: true
-  :lane: "1"
-- :run: "002"
-  :inputs: 
-  - /somotherpath/s_2_1_sequence.txt.gz
-  - /somotherpath/s_2_2_sequence.txt.gz
+  :lane: a-lane-library-designation
+  :inputs:
+  - /path/to/read_1_fastq/NA08752-1/H7HTNAFXX/ngs-ky481ac544_S2_R1_001.fastq.xz
+  - /path/to/read_2_fastq/NA08752-1/H7HTNAFXX/ngs-ky481ac544_S2_R2_001.fastq.xz
+  :interval_file: "/Shared/clinical_research_exome_S06588914_Covered_with_decoy.interval_list"
+- :run: another-run-name
   :is_paired: true
-  :lane: "2"
+  :lane: another-lane-library-designation
+  :inputs:
+  - /path/to/other_run/read_1_fastq/NA08752-1/HWVMFBGXX/ngs-ky481ac544_S3_R1_001.fastq.xz
+  - /path/to/other_run/read_1_fastq/NA08752-1/HWVMFBGXX/ngs-ky481ac544_S3_R2_001.fastq.xz
+  :interval_file: "/Shared/clinical_research_exome_S06588914_Covered_with_decoy.interval_list"
