@@ -17,8 +17,8 @@ DEFAULT:
     :skip_gvcf: false
 <<<<<<< HEAD
     :skip_indel_realign: true
-    :qsub_opts: "-q a_queue"
-    :tmp_dir_base: "/tmp"
+    :scheduler_opts: "-A an-account -p a-queue"
+    :tmp_dir_base: "/scratch"
     :trimmomatic:
     - ILLUMINACLIP:/Shared/clinical_adapter_clips.fa:4:10:10:8:true
     - LEADING:5
