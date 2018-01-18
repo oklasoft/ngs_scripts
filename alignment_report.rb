@@ -173,6 +173,9 @@ def demux_stats(conf,sample_name)
 end
 
 def demux_stats_from_o3(object_path)
+  unless object_path =~ /\Ao3:\/\//
+    return {}
+  end
   token = ENV['OS_AUTH_TOKEN']
   u = URI.parse(object_path)
 
