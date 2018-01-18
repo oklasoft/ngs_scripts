@@ -268,7 +268,7 @@ def picard_hs_ws(bam_path,o,mode,ref,i_file)
     $stderr.puts "Unable to start picard"
     return nil
   elsif 0 != status.exitstatus
-    $stderr.puts "Failure picard #{$?}"
+    $stderr.puts "Failure picard (#{cmd.join(" ")}) #{$?}"
     return nil
   end
   return o
