@@ -46,6 +46,7 @@ require 'uri-o3'
 require 'net/http'
 require 'csv'
 require 'yaml'
+require 'openssl'
 
 def metric_class(n,c,e,perc=false)
   s = eval("lambda {|x| #{c}}")
