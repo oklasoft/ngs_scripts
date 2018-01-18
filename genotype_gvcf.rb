@@ -196,6 +196,8 @@ def genotype_gvcfs(gatk_opts,opts)
     return true
   end
   cmd = %W/gatk -T GenotypeGVCFs --disable_auto_index_creation_and_locking_when_reading_rods
+           -jdk_deflater -jdk_inflater
+           -G StandardAnnotation
            -R #{gatk_opts[:reference]}
            -D #{gatk_opts[:snp]}/
   cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
