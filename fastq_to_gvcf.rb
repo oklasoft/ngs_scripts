@@ -325,7 +325,7 @@ def variant_call(sample_name,data)
     sbatch <%= scheduler_opts() %> -N 1 -n 1 -c 8 -o logs/slurm-%x.%A.log -W -J a_<%= sample_name %>_variants \\
     --mem 28 --wrap "gatk -T HaplotypeCaller \\
     -ERC GVCF -nct 8 -R ${GATK_REF} \\
-    -I ./<%= bam_dir %>/<%= sample_name %>.bam -A RMSMappingQuality -A MappingQualityRankSumTest -A MQRankSum -A ReadPosRankSum \\
+    -I ./<%= bam_dir %>/<%= sample_name %>.bam -G StandardAnnotation -G AS_StandardAnnotation -G StandardHCAnnotation \\
     -o <%= sample_name %>.g.vcf.gz <%= opt_d_rod_path(data) %> <%= opt_l_interval(data) %> <%= haplocaller_opts(data).join(" ") %>"
 
     if [ "$?" -ne "0" ]; then
