@@ -349,7 +349,9 @@ def merge_snp_indels(gatk_opts,opts)
   if opts[:checkpoint] && File.exists?(File.join(sdf_m[:dir],sdf_m[:files]))
     return true
   end
-  cmd = %W/gatk -T CombineVariants -genotypeMergeOptions UNSORTED --assumeIdenticalSamples --disable_auto_index_creation_and_locking_when_reading_rods
+  cmd = %W/gatk -T CombineVariants -genotypeMergeOptions UNSORTED
+           --assumeIdenticalSamples
+           --disable_auto_index_creation_and_locking_when_reading_rods
            -R #{gatk_opts[:reference]}/
   cmd += %W/-nt #{opts[:threads]}/ if opts[:threads] && opts[:threads] > 1
   cmd += sdf_f[:files].map {|i| ["-V",File.join("..",sdf_f[:dir],i)]}.flatten
