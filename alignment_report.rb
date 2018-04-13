@@ -44,6 +44,7 @@ require 'fileutils'
 require 'uri'
 require 'uri-o3'
 require 'net/http'
+require 'openssl'
 require 'csv'
 require 'yaml'
 
